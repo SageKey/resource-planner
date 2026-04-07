@@ -26,32 +26,15 @@ const HEALTH_OPTIONS = [
 
 const PRIORITY_OPTIONS = ["Highest", "High", "Medium", "Low"];
 
-const TYPE_OPTIONS = [
-  "Key Initiative",
-  "Enhancement",
-  "Support",
-  "Infrastructure",
-  "Research",
-];
-
-const TSHIRT_OPTIONS = [
-  "XS (< 40 hrs)",
-  "S (40-80 hrs)",
-  "M (80-200 hrs)",
-  "L (200-500 hrs)",
-  "XL (500-1000 hrs)",
-  "XXL (1000+ hrs)",
-];
-
 const ROLE_KEYS = [
-  { key: "pm", label: "PM %" },
-  { key: "ba", label: "BA %" },
-  { key: "functional", label: "Functional %" },
-  { key: "technical", label: "Technical %" },
-  { key: "developer", label: "Developer %" },
-  { key: "infrastructure", label: "Infra %" },
-  { key: "dba", label: "DBA %" },
-  { key: "erp", label: "ERP %" },
+  { key: "pm", label: "PM" },
+  { key: "ba", label: "BA" },
+  { key: "functional", label: "Functional" },
+  { key: "technical", label: "Technical" },
+  { key: "developer", label: "Developer" },
+  { key: "infrastructure", label: "Infra" },
+  { key: "dba", label: "DBA" },
+  { key: "erp", label: "ERP" },
 ];
 
 interface Props {
@@ -63,23 +46,11 @@ interface Props {
 type FormState = {
   id: string;
   name: string;
-  type: string;
-  portfolio: string;
-  sponsor: string;
   health: string;
-  pct_complete: string;
   priority: string;
+  est_hours: string;
   start_date: string;
   end_date: string;
-  team: string;
-  pm: string;
-  ba: string;
-  functional_lead: string;
-  technical_lead: string;
-  developer_lead: string;
-  tshirt_size: string;
-  est_hours: string;
-  notes: string;
   role_allocations: Record<string, string>;
 };
 
@@ -87,23 +58,11 @@ function blank(): FormState {
   return {
     id: "",
     name: "",
-    type: "Enhancement",
-    portfolio: "",
-    sponsor: "",
     health: "\u26aa NOT STARTED",
-    pct_complete: "0",
     priority: "Medium",
+    est_hours: "0",
     start_date: "",
     end_date: "",
-    team: "",
-    pm: "",
-    ba: "",
-    functional_lead: "",
-    technical_lead: "",
-    developer_lead: "",
-    tshirt_size: "",
-    est_hours: "0",
-    notes: "",
     role_allocations: Object.fromEntries(ROLE_KEYS.map((r) => [r.key, "0"])),
   };
 }
@@ -112,23 +71,11 @@ function fromProject(p: Project): FormState {
   return {
     id: p.id,
     name: p.name,
-    type: p.type ?? "Enhancement",
-    portfolio: p.portfolio ?? "",
-    sponsor: p.sponsor ?? "",
     health: p.health ?? "\u26aa NOT STARTED",
-    pct_complete: Math.round(p.pct_complete * 100).toString(),
     priority: p.priority ?? "Medium",
+    est_hours: (p.est_hours || 0).toString(),
     start_date: p.start_date ?? "",
     end_date: p.end_date ?? "",
-    team: p.team ?? "",
-    pm: p.pm ?? "",
-    ba: p.ba ?? "",
-    functional_lead: p.functional_lead ?? "",
-    technical_lead: p.technical_lead ?? "",
-    developer_lead: p.developer_lead ?? "",
-    tshirt_size: p.tshirt_size ?? "",
-    est_hours: (p.est_hours || 0).toString(),
-    notes: p.notes ?? "",
     role_allocations: Object.fromEntries(
       ROLE_KEYS.map((r) => [
         r.key,
@@ -179,23 +126,11 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
     const payload: Record<string, unknown> = {
       id: form.id.trim(),
       name: form.name.trim(),
-      type: form.type || null,
-      portfolio: form.portfolio || null,
-      sponsor: form.sponsor || null,
       health: form.health || null,
-      pct_complete: Math.max(0, Math.min(1, (parseFloat(form.pct_complete) || 0) / 100)),
       priority: form.priority || null,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
-      team: form.team || null,
-      pm: form.pm || null,
-      ba: form.ba || null,
-      functional_lead: form.functional_lead || null,
-      technical_lead: form.technical_lead || null,
-      developer_lead: form.developer_lead || null,
-      tshirt_size: form.tshirt_size || null,
       est_hours: parseFloat(form.est_hours) || 0,
-      notes: form.notes || null,
       role_allocations: roleAllocations,
     };
 
@@ -213,20 +148,20 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit project" : "Add project"}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Update project details, sizing, and role allocations."
-              : "Create a new project in the portfolio."}
+              ? "Update sizing, dates, and role allocations."
+              : "Add a new project to the portfolio."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
           {/* ID + Name */}
-          <div className="grid grid-cols-[120px_1fr] gap-3">
-            <Field label="Project ID">
+          <div className="grid grid-cols-[100px_1fr] gap-3">
+            <Field label="ID">
               <input
                 type="text"
                 value={form.id}
@@ -248,12 +183,12 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
             </Field>
           </div>
 
-          {/* Type, Priority, Health */}
+          {/* Health, Priority, Hours */}
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Type">
-              <select value={form.type} onChange={(e) => set("type", e.target.value)} className={inputCls}>
-                {TYPE_OPTIONS.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+            <Field label="Health">
+              <select value={form.health} onChange={(e) => set("health", e.target.value)} className={inputCls}>
+                {HEALTH_OPTIONS.map((h) => (
+                  <option key={h.value} value={h.value}>{h.label}</option>
                 ))}
               </select>
             </Field>
@@ -264,25 +199,6 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
                 ))}
               </select>
             </Field>
-            <Field label="Health">
-              <select value={form.health} onChange={(e) => set("health", e.target.value)} className={inputCls}>
-                {HEALTH_OPTIONS.map((h) => (
-                  <option key={h.value} value={h.value}>{h.label}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-
-          {/* T-Shirt, Hours, % Complete */}
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="T-Shirt Size">
-              <select value={form.tshirt_size} onChange={(e) => set("tshirt_size", e.target.value)} className={inputCls}>
-                <option value="">— none —</option>
-                {TSHIRT_OPTIONS.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </Field>
             <Field label="Est. Hours">
               <input
                 type="number"
@@ -290,17 +206,6 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
                 step={10}
                 value={form.est_hours}
                 onChange={(e) => set("est_hours", e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="% Complete">
-              <input
-                type="number"
-                min={0}
-                max={100}
-                step={5}
-                value={form.pct_complete}
-                onChange={(e) => set("pct_complete", e.target.value)}
                 className={inputCls}
               />
             </Field>
@@ -329,7 +234,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
           {/* Role Allocations */}
           <div>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Role Allocations
+              Role Allocations (%)
             </div>
             <div className="grid grid-cols-4 gap-2">
               {ROLE_KEYS.map((r) => (
@@ -350,34 +255,6 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
               ))}
             </div>
           </div>
-
-          {/* Leads */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Sponsor">
-              <input type="text" value={form.sponsor} onChange={(e) => set("sponsor", e.target.value)} className={inputCls} />
-            </Field>
-            <Field label="Team">
-              <input type="text" value={form.team} onChange={(e) => set("team", e.target.value)} className={inputCls} />
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Portfolio">
-              <input type="text" value={form.portfolio} onChange={(e) => set("portfolio", e.target.value)} className={inputCls} />
-            </Field>
-            <Field label="PM">
-              <input type="text" value={form.pm} onChange={(e) => set("pm", e.target.value)} className={inputCls} />
-            </Field>
-          </div>
-
-          {/* Notes */}
-          <Field label="Notes">
-            <textarea
-              value={form.notes}
-              onChange={(e) => set("notes", e.target.value)}
-              rows={2}
-              className={inputCls + " resize-none"}
-            />
-          </Field>
 
           {mutation.isError && (
             <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
