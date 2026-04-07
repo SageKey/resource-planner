@@ -1,16 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import type { TeamMemberOut, PersonDemandOut } from "@/types/roster";
+import type { TeamMember, PersonDemand } from "@/types/roster";
 
 export function useRoster() {
-  return useQuery<TeamMemberOut[]>({
+  return useQuery<TeamMember[]>({
     queryKey: ["roster"],
     queryFn: () => api.get("/roster/").then((r) => r.data),
   });
 }
 
 export function usePersonDemand() {
-  return useQuery<PersonDemandOut[]>({
+  return useQuery<PersonDemand[]>({
     queryKey: ["roster", "demand"],
     queryFn: () => api.get("/roster/demand").then((r) => r.data),
   });

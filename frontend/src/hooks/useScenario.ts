@@ -3,14 +3,14 @@ import api from "@/lib/api";
 import type {
   ScenarioEvaluateResponse,
   SchedulePortfolioResponse,
-  Modification,
+  ScenarioModification,
 } from "@/types/scenario";
 
 export function useEvaluateScenario() {
   return useMutation<
     ScenarioEvaluateResponse,
     Error,
-    { modifications: Modification[] }
+    { modifications: ScenarioModification[] }
   >({
     mutationFn: (payload) =>
       api.post("/scenarios/evaluate", payload).then((r) => r.data),
@@ -25,7 +25,7 @@ export function useSchedulePortfolio() {
       max_util_pct?: number;
       horizon_weeks?: number;
       exclude_ids?: string[];
-      modifications?: Modification[];
+      modifications?: ScenarioModification[];
     }
   >({
     mutationFn: (payload) =>

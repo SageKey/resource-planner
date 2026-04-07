@@ -1,165 +1,146 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  HelpCircle,
+  ChevronDown,
+  Sparkles,
+} from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
-import { useSchedulePortfolio } from "@/hooks/useScenario";
-import { formatDate } from "@/lib/format";
+import { ScenarioBuilder } from "@/components/planning/ScenarioBuilder";
+import { ScheduleView } from "@/components/planning/ScheduleView";
+import { ScenarioComparison } from "@/components/planning/ScenarioComparison";
+import { usePortfolio } from "@/hooks/usePortfolio";
+import { useRoster } from "@/hooks/useRoster";
+import { useEvaluateScenario } from "@/hooks/useScenario";
 import { cn } from "@/lib/cn";
+import type { ScenarioModification } from "@/types/scenario";
 
 export function Planning() {
-  const schedule = useSchedulePortfolio();
-  const [hasRun, setHasRun] = useState(false);
+  const [modifications, setModifications] = useState<ScenarioModification[]>([]);
+  const [showUtilDetail, setShowUtilDetail] = useState(false);
+  const portfolio = usePortfolio();
+  const roster = useRoster();
+  const evaluate = useEvaluateScenario();
 
-  const runScheduler = () => {
-    schedule.mutate({ horizon_weeks: 52 });
-    setHasRun(true);
-  };
+  const hasMods = modifications.length > 0;
 
-  const data = schedule.data;
+  useEffect(() => {
+    if (hasMods) {
+      evaluate.mutate({ modifications });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(modifications)]);
 
   return (
     <>
-      <TopBar title="Planning" subtitle="Auto-schedule projects and explore what-if scenarios.">
-        <button
-          onClick={runScheduler}
-          disabled={schedule.isPending}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-        >
-          {schedule.isPending ? "Scheduling..." : "Run Scheduler"}
-        </button>
-      </TopBar>
-      <div className="p-8 space-y-6">
-        {!hasRun && (
-          <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
-            Click "Run Scheduler" to see suggested project start dates based on team capacity.
-          </div>
-        )}
+      <TopBar
+        title="Planning"
+        subtitle="Capacity-driven scheduling and what-if analysis."
+      />
+      <div className="space-y-6 p-8">
+        <WorkflowGuide />
 
-        {schedule.isError && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
-            {(schedule.error as Error).message}
-          </div>
-        )}
+        <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+          <div className="space-y-4">
+            <ScenarioBuilder
+              modifications={modifications}
+              onChange={setModifications}
+              projects={Array.isArray(portfolio.data) ? portfolio.data : []}
+              roster={Array.isArray(roster.data) ? roster.data : []}
+            />
 
-        {data && (
-          <>
-            {/* Summary */}
-            <div className="grid grid-cols-4 gap-4">
-              <SummaryCard label="In-Flight" value={data.in_flight.length} color="blue" />
-              <SummaryCard label="Can Start Now" value={data.can_start_now_count} color="green" />
-              <SummaryCard label="Waiting" value={data.waiting_count} color="amber" />
-              <SummaryCard label="Infeasible" value={data.infeasible_count} color="red" />
-            </div>
-
-            {/* In-Flight Projects */}
-            {data.in_flight.length > 0 && (
-              <div className="rounded-xl border border-slate-200 bg-white p-6">
-                <h3 className="mb-3 text-sm font-semibold text-slate-700">
-                  In-Flight (consuming capacity)
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-left text-xs font-medium text-slate-500">
-                        <th className="px-3 py-2">Project</th>
-                        <th className="px-3 py-2">Priority</th>
-                        <th className="px-3 py-2 text-right">Hours</th>
-                        <th className="px-3 py-2 text-right">% Done</th>
-                        <th className="px-3 py-2">Start</th>
-                        <th className="px-3 py-2">End</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.in_flight.map((p) => (
-                        <tr key={p.project_id} className="border-b border-slate-50">
-                          <td className="px-3 py-2 font-medium text-slate-800">{p.project_name}</td>
-                          <td className="px-3 py-2 text-slate-600">{p.priority}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{p.est_hours.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{Math.round(p.pct_complete * 100)}%</td>
-                          <td className="px-3 py-2 tabular-nums text-slate-500">{formatDate(p.start_date)}</td>
-                          <td className="px-3 py-2 tabular-nums text-slate-500">{formatDate(p.end_date)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            {hasMods && (
+              <div className="rounded-xl border border-slate-200 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setShowUtilDetail(!showUtilDetail)}
+                  className="flex w-full items-center gap-2 px-5 py-3 text-left text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+                >
+                  <Sparkles className="h-4 w-4 text-slate-400" />
+                  Utilization impact detail
+                  <ChevronDown
+                    className={cn(
+                      "ml-auto h-4 w-4 text-slate-400 transition-transform",
+                      showUtilDetail && "rotate-180",
+                    )}
+                  />
+                </button>
+                {showUtilDetail && (
+                  <div className="border-t border-slate-100 p-4">
+                    <ScenarioComparison
+                      result={evaluate.data}
+                      isPending={evaluate.isPending}
+                      hasModifications={hasMods}
+                    />
+                  </div>
+                )}
               </div>
             )}
+          </div>
 
-            {/* Scheduled Projects */}
-            {data.projects.length > 0 && (
-              <div className="rounded-xl border border-slate-200 bg-white p-6">
-                <h3 className="mb-3 text-sm font-semibold text-slate-700">
-                  Plannable Projects (suggested dates)
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-left text-xs font-medium text-slate-500">
-                        <th className="px-3 py-2">Project</th>
-                        <th className="px-3 py-2">Priority</th>
-                        <th className="px-3 py-2 text-right">Hours</th>
-                        <th className="px-3 py-2">Suggested Start</th>
-                        <th className="px-3 py-2">Suggested End</th>
-                        <th className="px-3 py-2 text-right">Wait</th>
-                        <th className="px-3 py-2">Bottleneck</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.projects.map((p) => (
-                        <tr key={p.project_id} className="border-b border-slate-50">
-                          <td className="px-3 py-2 font-medium text-slate-800">{p.project_name}</td>
-                          <td className="px-3 py-2 text-slate-600">{p.priority}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{p.est_hours.toLocaleString()}</td>
-                          <td className="px-3 py-2 tabular-nums">
-                            {p.suggested_start ? (
-                              <span className={cn(p.can_start_now && "text-emerald-600 font-medium")}>
-                                {formatDate(p.suggested_start)}
-                              </span>
-                            ) : (
-                              <span className="text-red-500">No slot found</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 tabular-nums text-slate-500">
-                            {formatDate(p.suggested_end)}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-slate-600">
-                            {p.wait_weeks != null ? `${p.wait_weeks}w` : "—"}
-                          </td>
-                          <td className="px-3 py-2 text-slate-500">
-                            {p.bottleneck_role ?? "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+          <div>
+            <ScheduleView modifications={modifications} />
+          </div>
+        </div>
       </div>
     </>
   );
 }
 
-function SummaryCard({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number;
-  color: "blue" | "green" | "amber" | "red";
-}) {
-  const colors = {
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    amber: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-  };
+function WorkflowGuide() {
+  const [open, setOpen] = useState(false);
   return (
-    <div className={cn("rounded-xl border p-4", colors[color])}>
-      <div className="text-2xl font-bold tabular-nums">{value}</div>
-      <div className="text-xs font-medium opacity-80">{label}</div>
+    <div className="rounded-xl border border-slate-200 bg-white">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-2 px-5 py-3 text-left text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+      >
+        <HelpCircle className="h-4 w-4 text-slate-400" />
+        How to use the Planning module
+        <ChevronDown
+          className={cn(
+            "ml-auto h-4 w-4 text-slate-400 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="border-t border-slate-100 px-5 py-4 text-sm text-slate-600 space-y-4"
+        >
+          <div>
+            <div className="font-semibold text-slate-800 mb-1">1. Review the baseline schedule</div>
+            <p>
+              The right panel shows your current capacity picture: <strong>in-flight
+              projects</strong> consuming capacity at the top, then <strong>plannable
+              projects</strong> with suggested start dates based on when roles have room.
+            </p>
+          </div>
+          <div>
+            <div className="font-semibold text-slate-800 mb-1">2. Explore modifications</div>
+            <p>
+              Use the builder on the left to stack what-if changes: add a project,
+              exclude a person, hire someone, shift dates, resize scope, or change
+              allocations. The schedule re-computes live.
+            </p>
+          </div>
+          <div>
+            <div className="font-semibold text-slate-800 mb-1">3. Check utilization detail</div>
+            <p>
+              When modifications are active, expand <strong>Utilization impact
+              detail</strong> to see before/after utilization per role with delta arrows.
+            </p>
+          </div>
+          <div className="rounded-md bg-slate-50 px-4 py-3 text-xs text-slate-500 space-y-1">
+            <div><strong>Priority drives placement.</strong> Highest-priority projects get first pick of calendar space.</div>
+            <div><strong>In-flight projects are fixed.</strong> They consume capacity but their dates aren't moved.</div>
+            <div><strong>Bottleneck role</strong> = the role preventing an earlier start.</div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }

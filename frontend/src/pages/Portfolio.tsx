@@ -2,7 +2,7 @@ import { useState } from "react";
 import { TopBar } from "@/components/layout/TopBar";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { formatDate } from "@/lib/format";
-import type { ProjectOut } from "@/types/project";
+import type { Project } from "@/types/project";
 
 const HEALTH_STYLE: Record<string, string> = {
   "ON TRACK": "bg-emerald-100 text-emerald-800",

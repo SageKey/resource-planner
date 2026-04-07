@@ -1,3 +1,5 @@
+export type RoleStatus = "BLUE" | "GREEN" | "YELLOW" | "RED" | "GREY";
+
 export interface RoleDemandOut {
   project_id: string;
   project_name: string;

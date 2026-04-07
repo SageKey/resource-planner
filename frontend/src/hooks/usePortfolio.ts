@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import type { ProjectOut } from "@/types/project";
+import type { Project } from "@/types/project";
 
 export function usePortfolio(activeOnly = false) {
-  return useQuery<ProjectOut[]>({
+  return useQuery<Project[]>({
     queryKey: ["portfolio", { activeOnly }],
     queryFn: () =>
       api
@@ -13,7 +13,7 @@ export function usePortfolio(activeOnly = false) {
 }
 
 export function useProject(projectId: string) {
-  return useQuery<ProjectOut>({
+  return useQuery<Project>({
     queryKey: ["portfolio", projectId],
     queryFn: () => api.get(`/portfolio/${projectId}`).then((r) => r.data),
     enabled: !!projectId,
