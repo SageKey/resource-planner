@@ -20,7 +20,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    db_path: str = str(BACKEND_DIR / "planner.db")
+    db_path: str = "/data/planner.db"
     cors_origins: List[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
