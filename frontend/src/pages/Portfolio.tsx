@@ -1,8 +1,38 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { ChevronDown, FolderKanban } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { formatDate } from "@/lib/format";
+import { cn } from "@/lib/cn";
 import type { Project } from "@/types/project";
+
+// ---------------------------------------------------------------------------
+// Health grouping
+// ---------------------------------------------------------------------------
+
+const GROUP_ORDER = [
+  { key: "on_track", label: "On Track", icon: "\u{1f7e2}", headerColor: "text-emerald-700" },
+  { key: "needs_spec", label: "Needs Spec", icon: "\u{1f535}", headerColor: "text-blue-700" },
+  { key: "not_started", label: "Not Started", icon: "\u26aa", headerColor: "text-slate-600" },
+  { key: "postponed", label: "Postponed", icon: "\u23f8\ufe0f", headerColor: "text-slate-400" },
+  { key: "complete", label: "Complete", icon: "\u2705", headerColor: "text-emerald-500" },
+];
+
+function healthGroupKey(h: string | null | undefined): string {
+  if (!h) return "not_started";
+  const up = h.toUpperCase();
+  if (up.includes("ON TRACK") || up.includes("AT RISK") || up.includes("NEEDS HELP"))
+    return "on_track";
+  if (up.includes("NEEDS FUNCTIONAL SPEC") || up.includes("NEEDS TECHNICAL SPEC"))
+    return "needs_spec";
+  if (up.includes("POSTPONED")) return "postponed";
+  if (up.includes("COMPLETE") && !up.includes("INCOMPLETE")) return "complete";
+  return "not_started";
+}
+
+// ---------------------------------------------------------------------------
+// Health badge styling
+// ---------------------------------------------------------------------------
 
 const HEALTH_STYLE: Record<string, string> = {
   "ON TRACK": "bg-emerald-100 text-emerald-800",
@@ -27,13 +57,25 @@ function healthStyle(h: string | null | undefined): string {
 
 function healthText(h: string | null | undefined): string {
   if (!h) return "Unknown";
-  // Strip emoji prefix
   return h.replace(/^[^\w]*/, "").trim();
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+interface HealthGroup {
+  key: string;
+  label: string;
+  icon: string;
+  headerColor: string;
+  projects: Project[];
 }
 
 export function Portfolio() {
   const { data: projects, isLoading, isError, error } = usePortfolio();
   const [filter, setFilter] = useState("");
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const list = Array.isArray(projects) ? projects : [];
   const filtered = list.filter(
@@ -42,6 +84,31 @@ export function Portfolio() {
       p.name.toLowerCase().includes(filter.toLowerCase()) ||
       p.id.toLowerCase().includes(filter.toLowerCase()),
   );
+
+  // Group filtered projects by health status
+  const groups = useMemo<HealthGroup[]>(() => {
+    const map = new Map<string, Project[]>();
+    for (const p of filtered) {
+      const gk = healthGroupKey(p.health);
+      if (!map.has(gk)) map.set(gk, []);
+      map.get(gk)!.push(p);
+    }
+    return GROUP_ORDER
+      .filter((g) => map.has(g.key))
+      .map((g) => ({
+        ...g,
+        projects: map.get(g.key)!,
+      }));
+  }, [filtered]);
+
+  const toggleCollapse = (key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   return (
     <>
@@ -54,7 +121,7 @@ export function Portfolio() {
           className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
         />
       </TopBar>
-      <div className="p-8">
+      <div className="space-y-4 p-8">
         {isLoading && (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
             Loading projects...
@@ -65,63 +132,96 @@ export function Portfolio() {
             {(error as Error).message}
           </div>
         )}
-        {filtered.length > 0 && (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-xs font-medium text-slate-500">
-                  <th className="px-4 py-3">ID</th>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Health</th>
-                  <th className="px-4 py-3">Priority</th>
-                  <th className="px-4 py-3 text-right">Hours</th>
-                  <th className="px-4 py-3">T-Shirt</th>
-                  <th className="px-4 py-3">Start</th>
-                  <th className="px-4 py-3">End</th>
-                  <th className="px-4 py-3 text-right">% Done</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="border-b border-slate-50 hover:bg-slate-25 transition-colors"
-                  >
-                    <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
-                      {p.id}
-                    </td>
-                    <td className="px-4 py-2.5 font-medium text-slate-800">
-                      {p.name}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${healthStyle(p.health)}`}
+        {groups.map((group) => (
+          <div
+            key={group.key}
+            className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+          >
+            {/* Group header */}
+            <button
+              onClick={() => toggleCollapse(group.key)}
+              className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-slate-50 transition-colors"
+            >
+              <FolderKanban className={cn("h-4 w-4", group.headerColor)} />
+              <span className={cn("text-sm font-semibold", group.headerColor)}>
+                {group.icon} {group.label}
+              </span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                {group.projects.length}
+              </span>
+              <span className="ml-auto text-xs tabular-nums text-slate-400">
+                {group.projects.reduce((s, p) => s + (p.est_hours || 0), 0).toLocaleString()} hrs
+              </span>
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 text-slate-400 transition-transform",
+                  collapsed.has(group.key) && "-rotate-90",
+                )}
+              />
+            </button>
+
+            {/* Projects table */}
+            {!collapsed.has(group.key) && (
+              <div className="overflow-x-auto border-t border-slate-100">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-xs font-medium text-slate-500">
+                      <th className="px-4 py-2">ID</th>
+                      <th className="px-4 py-2">Name</th>
+                      <th className="px-4 py-2">Health</th>
+                      <th className="px-4 py-2">Priority</th>
+                      <th className="px-4 py-2 text-right">Hours</th>
+                      <th className="px-4 py-2">T-Shirt</th>
+                      <th className="px-4 py-2">Start</th>
+                      <th className="px-4 py-2">End</th>
+                      <th className="px-4 py-2 text-right">% Done</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.projects.map((p) => (
+                      <tr
+                        key={p.id}
+                        className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
                       >
-                        {healthText(p.health)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-600">{p.priority ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
-                      {p.est_hours > 0 ? p.est_hours.toLocaleString() : "—"}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-600">
-                      {p.tshirt_size ?? "—"}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-500 tabular-nums">
-                      {formatDate(p.start_date)}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-500 tabular-nums">
-                      {formatDate(p.end_date)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
-                      {Math.round(p.pct_complete * 100)}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
+                          {p.id}
+                        </td>
+                        <td className="px-4 py-2.5 font-medium text-slate-800">
+                          {p.name}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${healthStyle(p.health)}`}
+                          >
+                            {healthText(p.health)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600">
+                          {p.priority ?? "\u2014"}
+                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
+                          {p.est_hours > 0 ? p.est_hours.toLocaleString() : "\u2014"}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600">
+                          {p.tshirt_size ?? "\u2014"}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-500 tabular-nums">
+                          {formatDate(p.start_date)}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-500 tabular-nums">
+                          {formatDate(p.end_date)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
+                          {Math.round(p.pct_complete * 100)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
+        ))}
         {!isLoading && filtered.length === 0 && (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
             No projects found. Import data or add projects to get started.
