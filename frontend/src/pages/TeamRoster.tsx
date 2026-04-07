@@ -1,7 +1,11 @@
+import { useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
-import { useRoster } from "@/hooks/useRoster";
+import { EditMemberDialog } from "@/components/roster/EditMemberDialog";
+import { useRoster, useDeleteMember } from "@/hooks/useRoster";
 import { cn } from "@/lib/cn";
 import { avatarTone } from "@/lib/format";
+import type { TeamMember } from "@/types/roster";
 
 const ROLE_LABELS: Record<string, string> = {
   pm: "Project Manager",
@@ -17,10 +21,44 @@ const ROLE_LABELS: Record<string, string> = {
 export function TeamRoster() {
   const { data: rawMembers, isLoading, isError, error } = useRoster();
   const members = Array.isArray(rawMembers) ? rawMembers : [];
+  const deleteMember = useDeleteMember();
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editMember, setEditMember] = useState<TeamMember | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  const openNew = () => {
+    setEditMember(null);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (m: TeamMember) => {
+    setEditMember(m);
+    setDialogOpen(true);
+  };
+
+  const confirmDelete = (name: string) => {
+    setDeleteConfirm(name);
+  };
+
+  const handleDelete = () => {
+    if (deleteConfirm) {
+      deleteMember.mutate(deleteConfirm);
+      setDeleteConfirm(null);
+    }
+  };
 
   return (
     <>
-      <TopBar title="Roster" subtitle="Team members, capacity, and availability." />
+      <TopBar title="Roster" subtitle="Team members, capacity, and availability.">
+        <button
+          onClick={openNew}
+          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Add member
+        </button>
+      </TopBar>
       <div className="p-8">
         {isLoading && (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
@@ -40,18 +78,21 @@ export function TeamRoster() {
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Role</th>
                   <th className="px-4 py-3">Team</th>
+                  <th className="px-4 py-3">Vendor</th>
                   <th className="px-4 py-3 text-right">Weekly Hrs</th>
                   <th className="px-4 py-3 text-right">Support %</th>
                   <th className="px-4 py-3 text-right">Project Hrs</th>
                   <th className="px-4 py-3 text-center">In Capacity</th>
+                  <th className="px-4 py-3 w-10" />
                 </tr>
               </thead>
               <tbody>
                 {members.map((m) => (
                   <tr
                     key={m.name}
+                    onClick={() => openEdit(m)}
                     className={cn(
-                      "border-b border-slate-50 transition-colors hover:bg-slate-50",
+                      "border-b border-slate-50 transition-colors hover:bg-slate-50 cursor-pointer",
                       !m.include_in_capacity && "opacity-50",
                     )}
                   >
@@ -73,7 +114,8 @@ export function TeamRoster() {
                     <td className="px-4 py-2.5 text-slate-600">
                       {ROLE_LABELS[m.role_key] ?? m.role}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-500">{m.team ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{m.team || "—"}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{m.vendor || "—"}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
                       {m.weekly_hrs_available}
                     </td>
@@ -91,6 +133,18 @@ export function TeamRoster() {
                         )}
                       />
                     </td>
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          confirmDelete(m.name);
+                        }}
+                        className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                        aria-label="Delete member"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -99,10 +153,44 @@ export function TeamRoster() {
         )}
         {!isLoading && members.length === 0 && (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
-            No team members found. Import data or add members to get started.
+            No team members found. Click "Add member" to get started.
           </div>
         )}
       </div>
+
+      {/* Edit/Create Dialog */}
+      <EditMemberDialog
+        member={editMember}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
+
+      {/* Delete Confirmation */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <h3 className="text-sm font-semibold text-slate-900">Delete team member?</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Remove <strong>{deleteConfirm}</strong> from the roster? This also removes their project assignments.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteMember.isPending}
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {deleteMember.isPending ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
