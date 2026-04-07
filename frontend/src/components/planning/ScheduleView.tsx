@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { useSchedulePortfolio } from "@/hooks/useScenario";
 import type { ScenarioModification, InFlightProject } from "@/types/scenario";
+import { CalculationDetail } from "./CalculationDetail";
 
 const ROLE_LABEL: Record<string, string> = {
   pm: "PM",
@@ -406,6 +407,11 @@ function PlannableRow({
             Ready
           </span>
         ) : null}
+      </div>
+
+      {/* Calculation detail — expandable */}
+      <div className="col-span-12 -mt-1">
+        <CalculationDetail projectId={p.project_id} />
       </div>
     </motion.div>
   );

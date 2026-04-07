@@ -20,6 +20,7 @@ if str(_BACKEND_DIR) not in sys.path:
 from .config import settings
 from .routers import (
     capacity,
+    explain,
     import_data,
     meta,
     portfolio,
@@ -92,6 +93,7 @@ def create_app() -> FastAPI:
     app.include_router(roster.router, prefix=settings.api_prefix)
     app.include_router(scenarios.router, prefix=settings.api_prefix)
     app.include_router(sdlc.router, prefix=settings.api_prefix)
+    app.include_router(explain.router, prefix=settings.api_prefix)
     app.include_router(import_data.router, prefix=settings.api_prefix)
 
     return app
