@@ -10,17 +10,17 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=str(REPO_ROOT / "backend" / ".env"),
+        env_file=str(BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
-    db_path: str = str(REPO_ROOT / "backend" / "planner.db")
+    db_path: str = str(BACKEND_DIR / "planner.db")
     cors_origins: List[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
