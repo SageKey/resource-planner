@@ -15,7 +15,8 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export function TeamRoster() {
-  const { data: members, isLoading, isError, error } = useRoster();
+  const { data: rawMembers, isLoading, isError, error } = useRoster();
+  const members = Array.isArray(rawMembers) ? rawMembers : [];
 
   return (
     <>
@@ -31,7 +32,7 @@ export function TeamRoster() {
             {(error as Error).message}
           </div>
         )}
-        {members && members.length > 0 && (
+        {members.length > 0 && (
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
             <table className="w-full text-sm">
               <thead>
@@ -96,7 +97,7 @@ export function TeamRoster() {
             </table>
           </div>
         )}
-        {!isLoading && (!members || members.length === 0) && (
+        {!isLoading && members.length === 0 && (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
             No team members found. Import data or add members to get started.
           </div>

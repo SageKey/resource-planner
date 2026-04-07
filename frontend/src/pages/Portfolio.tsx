@@ -35,7 +35,8 @@ export function Portfolio() {
   const { data: projects, isLoading, isError, error } = usePortfolio();
   const [filter, setFilter] = useState("");
 
-  const filtered = (projects ?? []).filter(
+  const list = Array.isArray(projects) ? projects : [];
+  const filtered = list.filter(
     (p) =>
       !filter ||
       p.name.toLowerCase().includes(filter.toLowerCase()) ||
