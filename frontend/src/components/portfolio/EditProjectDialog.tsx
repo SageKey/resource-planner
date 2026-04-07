@@ -48,6 +48,7 @@ type FormState = {
   name: string;
   health: string;
   priority: string;
+  pct_complete: string;
   est_hours: string;
   start_date: string;
   end_date: string;
@@ -60,6 +61,7 @@ function blank(): FormState {
     name: "",
     health: "\u26aa NOT STARTED",
     priority: "Medium",
+    pct_complete: "0",
     est_hours: "0",
     start_date: "",
     end_date: "",
@@ -73,6 +75,7 @@ function fromProject(p: Project): FormState {
     name: p.name,
     health: p.health ?? "\u26aa NOT STARTED",
     priority: p.priority ?? "Medium",
+    pct_complete: Math.round(p.pct_complete * 100).toString(),
     est_hours: (p.est_hours || 0).toString(),
     start_date: p.start_date ?? "",
     end_date: p.end_date ?? "",
@@ -128,6 +131,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
       name: form.name.trim(),
       health: form.health || null,
       priority: form.priority || null,
+      pct_complete: Math.max(0, Math.min(1, (parseFloat(form.pct_complete) || 0) / 100)),
       start_date: form.start_date || null,
       end_date: form.end_date || null,
       est_hours: parseFloat(form.est_hours) || 0,
@@ -183,8 +187,8 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
             </Field>
           </div>
 
-          {/* Health, Priority, Hours */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* Health, Priority */}
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Health">
               <select value={form.health} onChange={(e) => set("health", e.target.value)} className={inputCls}>
                 {HEALTH_OPTIONS.map((h) => (
@@ -199,6 +203,10 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
                 ))}
               </select>
             </Field>
+          </div>
+
+          {/* Hours, % Complete */}
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Est. Hours">
               <input
                 type="number"
@@ -206,6 +214,17 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
                 step={10}
                 value={form.est_hours}
                 onChange={(e) => set("est_hours", e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="% Complete">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={5}
+                value={form.pct_complete}
+                onChange={(e) => set("pct_complete", e.target.value)}
                 className={inputCls}
               />
             </Field>
