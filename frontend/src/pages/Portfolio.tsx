@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, FolderKanban } from "lucide-react";
+import { ChevronDown, FolderKanban, Plus, Trash2 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
-import { usePortfolio } from "@/hooks/usePortfolio";
+import { EditProjectDialog } from "@/components/portfolio/EditProjectDialog";
+import { usePortfolio, useDeleteProject } from "@/hooks/usePortfolio";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { Project } from "@/types/project";
@@ -74,8 +75,29 @@ interface HealthGroup {
 
 export function Portfolio() {
   const { data: projects, isLoading, isError, error } = usePortfolio();
+  const deleteProject = useDeleteProject();
   const [filter, setFilter] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editProject, setEditProject] = useState<Project | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  const openNew = () => {
+    setEditProject(null);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (p: Project) => {
+    setEditProject(p);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = () => {
+    if (deleteConfirm) {
+      deleteProject.mutate(deleteConfirm);
+      setDeleteConfirm(null);
+    }
+  };
 
   const list = Array.isArray(projects) ? projects : [];
   const filtered = list.filter(
@@ -120,6 +142,13 @@ export function Portfolio() {
           onChange={(e) => setFilter(e.target.value)}
           className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
         />
+        <button
+          onClick={openNew}
+          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Add project
+        </button>
       </TopBar>
       <div className="space-y-4 p-8">
         {isLoading && (
@@ -175,13 +204,15 @@ export function Portfolio() {
                       <th className="px-4 py-2">Start</th>
                       <th className="px-4 py-2">End</th>
                       <th className="px-4 py-2 text-right">% Done</th>
+                      <th className="px-4 py-2 w-10" />
                     </tr>
                   </thead>
                   <tbody>
                     {group.projects.map((p) => (
                       <tr
                         key={p.id}
-                        className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
+                        onClick={() => openEdit(p)}
+                        className="border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer"
                       >
                         <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
                           {p.id}
@@ -214,6 +245,18 @@ export function Portfolio() {
                         <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
                           {Math.round(p.pct_complete * 100)}%
                         </td>
+                        <td className="px-4 py-2.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirm(p.id);
+                            }}
+                            className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                            aria-label="Delete project"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -224,10 +267,42 @@ export function Portfolio() {
         ))}
         {!isLoading && filtered.length === 0 && (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
-            No projects found. Import data or add projects to get started.
+            No projects found. Click "Add project" to get started.
           </div>
         )}
       </div>
+
+      <EditProjectDialog
+        project={editProject}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <h3 className="text-sm font-semibold text-slate-900">Delete project?</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Remove <strong>{deleteConfirm}</strong> and all its allocations? This cannot be undone.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteProject.isPending}
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {deleteProject.isPending ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
