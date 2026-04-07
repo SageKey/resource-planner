@@ -16,11 +16,11 @@ export function Capacity() {
       <div className="space-y-6 p-8">
         {util.isLoading && <LoadingCard text="Computing utilization..." />}
         {util.isError && <ErrorCard err={util.error as Error} />}
-        {util.data && <UtilizationBars roles={util.data.roles} />}
+        {util.data?.roles && <UtilizationBars roles={util.data.roles} />}
 
         {heat.isLoading && <LoadingCard text="Building heatmap..." />}
         {heat.isError && <ErrorCard err={heat.error as Error} />}
-        {heat.data && <HeatmapGrid data={heat.data} />}
+        {heat.data?.rows && <HeatmapGrid data={heat.data} />}
       </div>
     </>
   );

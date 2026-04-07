@@ -34,6 +34,7 @@ interface Props {
 }
 
 export function UtilizationBars({ roles }: Props) {
+  if (!roles) return null;
   const sorted = Object.values(roles).sort(
     (a, b) => b.utilization_pct - a.utilization_pct,
   );
