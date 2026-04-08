@@ -47,7 +47,9 @@ def heatmap(
         for role_key, snapshots in timeline.items():
             for snap in snapshots:
                 delta_days = (snap.week_start - scan_start).days
-                week_idx = 0 if delta_days < 0 else delta_days // 7
+                if delta_days < 0:
+                    continue  # skip past weeks
+                week_idx = delta_days // 7
                 if week_idx < weeks:
                     demand_grid[role_key][week_idx] += snap.role_demand_hrs
 
@@ -117,8 +119,10 @@ def person_heatmap(
         for role_key, snapshots in timeline.items():
             for snap in snapshots:
                 delta_days = (snap.week_start - scan_start).days
-                week_idx = 0 if delta_days < 0 else delta_days // 7
-                if 0 <= week_idx < weeks:
+                if delta_days < 0:
+                    continue  # skip past weeks
+                week_idx = delta_days // 7
+                if week_idx < weeks:
                     project_role_weekly[project.id][role_key][week_idx] += snap.role_demand_hrs
 
     # For each person, compute their weekly demand
