@@ -28,17 +28,19 @@ export function AssignmentMatrix() {
   const [editing, setEditing] = useState<CellEdit | null>(null);
   const [editValue, setEditValue] = useState("");
 
-  // Flat sorted people list for column headers
+  const projects = data?.projects ?? [];
+  const people = data?.people ?? [];
+  const assignments = data?.assignments ?? {};
+
+  // ALL hooks must be above any early return
   const sortedPeople = useMemo(() => {
-    if (!data) return [];
-    return [...data.people].sort((a, b) => {
+    return [...people].sort((a, b) => {
       const teamCmp = (a.team || "").localeCompare(b.team || "");
       if (teamCmp !== 0) return teamCmp;
       return a.name.localeCompare(b.name);
     });
-  }, [data]);
+  }, [people]);
 
-  // Team boundaries for column group headers
   const teamColumns = useMemo(() => {
     const groups: { team: string; start: number; count: number }[] = [];
     let current = "";
@@ -54,7 +56,16 @@ export function AssignmentMatrix() {
     return groups;
   }, [sortedPeople]);
 
-  if (isLoading || !data) {
+  const projectTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const [pid, ppl] of Object.entries(assignments)) {
+      totals.set(pid, Object.keys(ppl).length);
+    }
+    return totals;
+  }, [assignments]);
+
+  // Now safe to do early returns
+  if (isLoading) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
         Loading assignment matrix...
@@ -62,9 +73,7 @@ export function AssignmentMatrix() {
     );
   }
 
-  const { projects, assignments } = data;
-
-  if (projects.length === 0 || data.people.length === 0) {
+  if (projects.length === 0 || people.length === 0) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
         Need both projects and team members to show the assignment matrix.
@@ -82,12 +91,7 @@ export function AssignmentMatrix() {
 
   const handleCellClick = (personName: string, roleKey: string, projectId: string) => {
     const pct = getCellPct(personName, projectId);
-    setEditing({
-      person: personName,
-      projectId,
-      roleKey,
-      currentPct: pct,
-    });
+    setEditing({ person: personName, projectId, roleKey, currentPct: pct });
     setEditValue(pct != null ? Math.round(pct * 100).toString() : "100");
   };
 
@@ -127,15 +131,6 @@ export function AssignmentMatrix() {
     if (e.key === "Enter") handleSave();
     if (e.key === "Escape") setEditing(null);
   };
-
-  // Count assignments per project
-  const projectTotals = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const [pid, people] of Object.entries(assignments)) {
-      totals.set(pid, Object.keys(people).length);
-    }
-    return totals;
-  }, [assignments]);
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white">
