@@ -262,10 +262,10 @@ export function TeamRoster() {
         )}
 
         {/* Tab: Workload (Person Demand) */}
-        {tab === "demand" && members.length > 0 && <PersonDemandTable />}
+        {tab === "demand" && members.length > 0 && <PersonDemandTable roster={members} />}
 
         {/* Tab: Availability */}
-        {tab === "availability" && members.length > 0 && <PersonAvailabilityTable />}
+        {tab === "availability" && members.length > 0 && <PersonAvailabilityTable roster={members} />}
       </div>
 
       {/* Edit/Create Dialog */}
