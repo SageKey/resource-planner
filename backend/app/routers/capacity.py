@@ -76,6 +76,58 @@ def heatmap(
     return HeatmapResponse(weeks=week_labels, rows=rows)
 
 
+@router.get("/assignment-coverage")
+def assignment_coverage(
+    engine: CapacityEngine = Depends(get_capacity),
+):
+    """Per-role breakdown of assigned vs unassigned demand.
+
+    For each role, computes:
+    - total_demand: all project demand for this role
+    - assigned_demand: demand from projects where someone is explicitly assigned
+    - unassigned_demand: demand from projects with no assignment for this role
+    """
+    data = engine._load()
+    active = data["active_portfolio"]
+    assignments = data.get("assignments", [])
+
+    # Build set of (project_id, role_key) that have explicit assignments
+    assigned_project_roles = set()
+    for a in assignments:
+        assigned_project_roles.add((a.project_id, a.role_key))
+
+    # Compute demand per project per role
+    role_assigned = defaultdict(float)
+    role_unassigned = defaultdict(float)
+
+    for project in active:
+        for demand in engine.compute_project_role_demand(project):
+            key = (project.id, demand.role_key)
+            if key in assigned_project_roles:
+                role_assigned[demand.role_key] += demand.weekly_hours
+            else:
+                role_unassigned[demand.role_key] += demand.weekly_hours
+
+    supply = engine.compute_supply_by_role()
+    result = {}
+    all_roles = set(role_assigned.keys()) | set(role_unassigned.keys()) | set(supply.keys())
+
+    for role_key in sorted(all_roles):
+        s = supply.get(role_key, 0)
+        a = role_assigned.get(role_key, 0)
+        u = role_unassigned.get(role_key, 0)
+        result[role_key] = {
+            "supply_hrs_week": round(s, 1),
+            "assigned_hrs_week": round(a, 1),
+            "unassigned_hrs_week": round(u, 1),
+            "total_demand_hrs_week": round(a + u, 1),
+            "assigned_pct": round(a / s, 4) if s > 0 else 0,
+            "unassigned_pct": round(u / s, 4) if s > 0 else 0,
+        }
+
+    return result
+
+
 @router.get("/person-heatmap")
 def person_heatmap(
     weeks: int = Query(26, ge=1, le=104),

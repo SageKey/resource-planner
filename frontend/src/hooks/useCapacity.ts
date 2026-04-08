@@ -17,6 +17,23 @@ export function useHeatmap(weeks = 26) {
   });
 }
 
+export interface RoleCoverage {
+  supply_hrs_week: number;
+  assigned_hrs_week: number;
+  unassigned_hrs_week: number;
+  total_demand_hrs_week: number;
+  assigned_pct: number;
+  unassigned_pct: number;
+}
+
+export function useAssignmentCoverage() {
+  return useQuery<Record<string, RoleCoverage>>({
+    queryKey: ["capacity", "assignment-coverage"],
+    queryFn: () =>
+      api.get("/capacity/assignment-coverage").then((r) => r.data),
+  });
+}
+
 export interface PersonHeatmapRow {
   name: string;
   role_key: string;
