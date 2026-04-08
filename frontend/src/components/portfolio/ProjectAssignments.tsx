@@ -29,6 +29,8 @@ export function ProjectAssignments({ projectId }: Props) {
   const [selectedPerson, setSelectedPerson] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [allocPct, setAllocPct] = useState("100");
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editPct, setEditPct] = useState("");
 
   const roster = Array.isArray(rosterData) ? rosterData : [];
   const list = Array.isArray(assignments) ? assignments : [];
@@ -93,34 +95,86 @@ export function ProjectAssignments({ projectId }: Props) {
       )}
       {list.length > 0 && (
         <div className="space-y-1 mb-2">
-          {list.map((a) => (
-            <div
-              key={`${a.person_name}::${a.role_key}`}
-              className="flex items-center gap-2 rounded-md border border-slate-100 bg-slate-50 px-3 py-1.5"
-            >
+          {list.map((a) => {
+            const key = `${a.person_name}::${a.role_key}`;
+            const isEditing = editingKey === key;
+            return (
               <div
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold"
-                style={{ backgroundColor: avatarTone(a.person_name) }}
+                key={key}
+                className="flex items-center gap-2 rounded-md border border-slate-100 bg-slate-50 px-3 py-1.5"
               >
-                {a.person_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                <div
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold"
+                  style={{ backgroundColor: avatarTone(a.person_name) }}
+                >
+                  {a.person_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                </div>
+                <span className="text-sm font-medium text-slate-800 flex-1">
+                  {a.person_name}
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  {ROLE_LABELS[a.role_key] ?? a.role_key}
+                </span>
+                {isEditing ? (
+                  <span className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      step={5}
+                      value={editPct}
+                      onChange={(e) => setEditPct(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const pct = Math.max(1, Math.min(100, parseInt(editPct) || 100));
+                          createAssignment.mutate({
+                            projectId,
+                            person_name: a.person_name,
+                            role_key: a.role_key,
+                            allocation_pct: pct / 100,
+                          }, { onSuccess: () => setEditingKey(null) });
+                        }
+                        if (e.key === "Escape") setEditingKey(null);
+                      }}
+                      autoFocus
+                      className="w-14 rounded border border-indigo-300 bg-white px-1.5 py-0.5 text-center text-[11px] tabular-nums focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    />
+                    <button
+                      onClick={() => {
+                        const pct = Math.max(1, Math.min(100, parseInt(editPct) || 100));
+                        createAssignment.mutate({
+                          projectId,
+                          person_name: a.person_name,
+                          role_key: a.role_key,
+                          allocation_pct: pct / 100,
+                        }, { onSuccess: () => setEditingKey(null) });
+                      }}
+                      className="text-[10px] font-medium text-indigo-600 hover:text-indigo-800"
+                    >
+                      Save
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setEditingKey(key);
+                      setEditPct(Math.round(a.allocation_pct * 100).toString());
+                    }}
+                    className="text-[11px] font-medium tabular-nums text-slate-700 w-12 text-right hover:text-indigo-600 hover:underline transition-colors cursor-pointer"
+                    title="Click to edit allocation %"
+                  >
+                    {Math.round(a.allocation_pct * 100)}%
+                  </button>
+                )}
+                <button
+                  onClick={() => handleRemove(a.person_name, a.role_key)}
+                  className="rounded p-0.5 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
               </div>
-              <span className="text-sm font-medium text-slate-800 flex-1">
-                {a.person_name}
-              </span>
-              <span className="text-[11px] text-slate-500">
-                {ROLE_LABELS[a.role_key] ?? a.role_key}
-              </span>
-              <span className="text-[11px] font-medium tabular-nums text-slate-700 w-12 text-right">
-                {Math.round(a.allocation_pct * 100)}%
-              </span>
-              <button
-                onClick={() => handleRemove(a.person_name, a.role_key)}
-                className="rounded p-0.5 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
       {!isLoading && list.length === 0 && !adding && (
