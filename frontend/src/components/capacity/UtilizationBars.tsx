@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/cn";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -46,12 +47,15 @@ interface Props {
 }
 
 export function UtilizationBars({ roles, coverage }: Props) {
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+
   if (!roles) return null;
   const sorted = Object.values(roles).sort(
     (a, b) => b.utilization_pct - a.utilization_pct,
   );
 
   const hasCoverage = !!coverage;
+  const selectedData = selectedRole ? roles[selectedRole] : null;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -63,9 +67,9 @@ export function UtilizationBars({ roles, coverage }: Props) {
           <p><strong>Demand</strong> = For each active project: Remaining Hours × Role Allocation % / Duration Weeks. Summed across all active projects for that role.</p>
           <p><strong>Remaining Hours</strong> = Est Hours × (1 - % Complete). A project 80% done only counts 20% of its hours.</p>
           <p><strong>Supply</strong> = Sum of project capacity hours across all team members in that role. Project capacity = Weekly Hours × (1 - Support Reserve %).</p>
-          <p><strong>Assigned</strong> = Demand from projects where someone is explicitly assigned to this role (via Assignments tab).</p>
-          <p><strong>Unassigned</strong> = Demand from projects that need this role but have no person assigned yet.</p>
-          <p className="text-slate-400">Colors: green &lt;80%, yellow 80-99%, red &ge;100%.</p>
+          <p><strong>Assigned</strong> = Demand from projects with explicit person assignments.</p>
+          <p><strong>Unassigned</strong> = Demand from projects with no person assigned for this role.</p>
+          <p className="text-slate-400">Click any row to see the project-by-project breakdown.</p>
         </InfoTooltip>
       </h2>
       <table className="w-full">
@@ -96,7 +100,18 @@ export function UtilizationBars({ roles, coverage }: Props) {
             const unassignedHrs = cov?.unassigned_hrs_week ?? 0;
 
             return (
-              <tr key={role.role_key} className="border-t border-slate-50">
+              <tr
+                key={role.role_key}
+                onClick={() =>
+                  setSelectedRole(
+                    selectedRole === role.role_key ? null : role.role_key,
+                  )
+                }
+                className={cn(
+                  "border-t border-slate-50 cursor-pointer transition-colors hover:bg-slate-50",
+                  selectedRole === role.role_key && "bg-indigo-50/50",
+                )}
+              >
                 <td className="py-2 pr-3 text-xs font-medium text-slate-600">
                   {ROLE_LABELS[role.role_key] ?? role.role_key}
                 </td>
@@ -139,6 +154,80 @@ export function UtilizationBars({ roles, coverage }: Props) {
           })}
         </tbody>
       </table>
+
+      {/* Role detail modal */}
+      {selectedData && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setSelectedRole(null)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-semibold text-slate-800">
+                {ROLE_LABELS[selectedData.role_key] ?? selectedData.role_key} — Demand Breakdown
+              </div>
+              <button
+                onClick={() => setSelectedRole(null)}
+                className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="flex gap-4 mb-3 text-xs">
+              <div>
+                <span className="text-slate-500">Supply:</span>{" "}
+                <span className="font-semibold text-slate-700">{selectedData.supply_hrs_week.toFixed(1)}h/wk</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Demand:</span>{" "}
+                <span className="font-semibold text-slate-700">{selectedData.demand_hrs_week.toFixed(1)}h/wk</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Utilization:</span>{" "}
+                <span className="font-semibold text-slate-700">
+                  {Math.round(selectedData.utilization_pct * 100)}%
+                </span>
+              </div>
+            </div>
+
+            {selectedData.demand_breakdown.length > 0 ? (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    <th className="pb-1.5 pr-3">Project</th>
+                    <th className="pb-1.5 pr-3 text-right">Role Alloc</th>
+                    <th className="pb-1.5 text-right">Demand/wk</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...selectedData.demand_breakdown]
+                    .sort((a, b) => b.weekly_hours - a.weekly_hours)
+                    .map((d) => (
+                      <tr key={d.project_id} className="border-b border-slate-50">
+                        <td className="py-1.5 pr-3">
+                          <span className="font-mono text-slate-400">{d.project_id}</span>{" "}
+                          <span className="font-medium text-slate-700">{d.project_name}</span>
+                        </td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums text-slate-600">
+                          {Math.round(d.role_alloc_pct * 100)}%
+                        </td>
+                        <td className="py-1.5 text-right tabular-nums font-semibold text-slate-800">
+                          {d.weekly_hours.toFixed(1)}h
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-xs text-slate-400">No projects contributing demand for this role.</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
