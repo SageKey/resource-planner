@@ -132,11 +132,11 @@ export function ProjectAssignments({ projectId }: Props) {
       {/* Add form */}
       {adding && (
         <div className="rounded-md border border-indigo-200 bg-indigo-50/30 p-3 space-y-2">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+          <div className="space-y-2">
             <select
               value={selectedPerson}
               onChange={(e) => handlePersonSelect(e.target.value)}
-              className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
             >
               <option value="">Select person...</option>
               {roster
@@ -148,27 +148,30 @@ export function ProjectAssignments({ projectId }: Props) {
                   </option>
                 ))}
             </select>
-            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-              className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-            >
-              <option value="">Role...</option>
-              {Object.entries(ROLE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
-            <div className="relative">
-              <input
-                type="number"
-                min={1}
-                max={100}
-                step={5}
-                value={allocPct}
-                onChange={(e) => setAllocPct(e.target.value)}
-                className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-center tabular-nums focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-              />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">%</span>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              >
+                <option value="">Role...</option>
+                {Object.entries(ROLE_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={5}
+                  value={allocPct}
+                  onChange={(e) => setAllocPct(e.target.value)}
+                  className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm text-center tabular-nums focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  placeholder="Allocation %"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">%</span>
+              </div>
             </div>
           </div>
           <div className="flex justify-end gap-2">

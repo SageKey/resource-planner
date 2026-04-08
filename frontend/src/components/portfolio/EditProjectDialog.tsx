@@ -153,7 +153,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit project" : "Add project"}</DialogTitle>
           <DialogDescription>
