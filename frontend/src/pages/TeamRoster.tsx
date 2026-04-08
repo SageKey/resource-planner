@@ -179,6 +179,7 @@ export function TeamRoster() {
                           <th className="px-4 py-2">Vendor</th>
                           <th className="px-4 py-2 text-right">Weekly Hrs</th>
                           <th className="px-4 py-2 text-right">Support %</th>
+                          <th className="px-4 py-2 text-right">Project %</th>
                           <th className="px-4 py-2 text-right">Project Hrs</th>
                           <th className="px-4 py-2 text-center">In Capacity</th>
                           <th className="px-4 py-2 w-10" />
@@ -222,6 +223,9 @@ export function TeamRoster() {
                             </td>
                             <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
                               {Math.round(m.support_reserve_pct * 100)}%
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
+                              {Math.round(m.project_capacity_pct * 100)}%
                             </td>
                             <td className="px-4 py-2.5 text-right tabular-nums font-medium text-slate-800">
                               {m.project_capacity_hrs.toFixed(1)}

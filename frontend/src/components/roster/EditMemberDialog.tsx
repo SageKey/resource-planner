@@ -206,7 +206,7 @@ export function EditMemberDialog({ member, open, onOpenChange }: Props) {
             </Field>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Weekly hours">
               <NumberInput
                 value={form.weekly_hrs_available}
@@ -216,7 +216,18 @@ export function EditMemberDialog({ member, open, onOpenChange }: Props) {
                 suffix="hrs"
               />
             </Field>
-            <Field label="Support reserve">
+            <Field label="Rate">
+              <NumberInput
+                value={form.rate_per_hour}
+                onChange={(v) => set("rate_per_hour", v)}
+                min={0}
+                prefix="$"
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Support %">
               <NumberInput
                 value={form.support_reserve_pct}
                 onChange={(v) => set("support_reserve_pct", v)}
@@ -225,13 +236,18 @@ export function EditMemberDialog({ member, open, onOpenChange }: Props) {
                 suffix="%"
               />
             </Field>
-            <Field label="Rate">
-              <NumberInput
-                value={form.rate_per_hour}
-                onChange={(v) => set("rate_per_hour", v)}
-                min={0}
-                prefix="$"
-              />
+            <Field label="Project %">
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm tabular-nums text-slate-700">
+                {Math.max(0, 100 - (Number.parseFloat(form.support_reserve_pct) || 0))}%
+              </div>
+            </Field>
+            <Field label="Project hrs/wk">
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm tabular-nums text-slate-700">
+                {(
+                  (Number.parseFloat(form.weekly_hrs_available) || 0) *
+                  (1 - Math.min(1, (Number.parseFloat(form.support_reserve_pct) || 0) / 100))
+                ).toFixed(1)}
+              </div>
             </Field>
           </div>
 
