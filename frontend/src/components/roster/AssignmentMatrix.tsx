@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Check, X } from "lucide-react";
+import { useMemo } from "react";
+import { Check } from "lucide-react";
 import {
   useAssignmentMatrix,
   useCreateAssignment,
@@ -14,25 +14,15 @@ const ROLE_LABELS: Record<string, string> = {
   erp: "ERP", "wms consultant": "WMS Consultant",
 };
 
-interface CellEdit {
-  person: string;
-  projectId: string;
-  roleKey: string;
-  currentPct: number | null;
-}
-
 export function AssignmentMatrix() {
   const { data, isLoading } = useAssignmentMatrix();
   const createAssignment = useCreateAssignment();
   const deleteAssignment = useDeleteAssignment();
-  const [editing, setEditing] = useState<CellEdit | null>(null);
-  const [editValue, setEditValue] = useState("");
 
   const projects = data?.projects ?? [];
   const people = data?.people ?? [];
   const assignments = data?.assignments ?? {};
 
-  // ALL hooks must be above any early return
   const sortedPeople = useMemo(() => {
     return [...people].sort((a, b) => {
       const teamCmp = (a.team || "").localeCompare(b.team || "");
@@ -64,7 +54,6 @@ export function AssignmentMatrix() {
     return totals;
   }, [assignments]);
 
-  // Now safe to do early returns
   if (isLoading) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
@@ -81,55 +70,25 @@ export function AssignmentMatrix() {
     );
   }
 
-  const getCellPct = (personName: string, projectId: string): number | null => {
-    const projAssignments = assignments[projectId];
-    if (!projAssignments) return null;
-    const entry = projAssignments[personName];
-    if (!entry) return null;
-    return entry.allocation_pct;
+  const isAssigned = (personName: string, projectId: string): boolean => {
+    return !!assignments[projectId]?.[personName];
   };
 
-  const handleCellClick = (personName: string, roleKey: string, projectId: string) => {
-    const pct = getCellPct(personName, projectId);
-    setEditing({ person: personName, projectId, roleKey, currentPct: pct });
-    setEditValue(pct != null ? Math.round(pct * 100).toString() : "100");
-  };
-
-  const handleSave = () => {
-    if (!editing) return;
-    const pct = Math.max(0, Math.min(100, parseInt(editValue) || 0));
-    if (pct === 0) {
-      if (editing.currentPct != null) {
-        deleteAssignment.mutate({
-          projectId: editing.projectId,
-          person_name: editing.person,
-          role_key: editing.roleKey,
-        });
-      }
+  const toggleAssignment = (personName: string, roleKey: string, projectId: string) => {
+    if (isAssigned(personName, projectId)) {
+      deleteAssignment.mutate({
+        projectId,
+        person_name: personName,
+        role_key: roleKey,
+      });
     } else {
       createAssignment.mutate({
-        projectId: editing.projectId,
-        person_name: editing.person,
-        role_key: editing.roleKey,
-        allocation_pct: pct / 100,
+        projectId,
+        person_name: personName,
+        role_key: roleKey,
+        allocation_pct: 1.0,
       });
     }
-    setEditing(null);
-  };
-
-  const handleRemove = () => {
-    if (!editing || editing.currentPct == null) return;
-    deleteAssignment.mutate({
-      projectId: editing.projectId,
-      person_name: editing.person,
-      role_key: editing.roleKey,
-    });
-    setEditing(null);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleSave();
-    if (e.key === "Escape") setEditing(null);
   };
 
   return (
@@ -162,7 +121,7 @@ export function AssignmentMatrix() {
               {sortedPeople.map((person) => (
                 <th
                   key={person.name}
-                  className="border-b border-slate-200 px-0.5 py-1.5 text-center font-normal min-w-[52px]"
+                  className="border-b border-slate-200 px-0.5 py-1.5 text-center font-normal min-w-[48px]"
                   title={`${person.name} (${ROLE_LABELS[person.role_key] ?? person.role_key})`}
                 >
                   <div className="flex flex-col items-center gap-0.5">
@@ -172,7 +131,7 @@ export function AssignmentMatrix() {
                     >
                       {person.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                     </div>
-                    <div className="text-[9px] font-medium text-slate-700 leading-tight max-w-[50px] truncate">
+                    <div className="text-[9px] font-medium text-slate-700 leading-tight max-w-[46px] truncate">
                       {person.name.split(" ")[0]}
                     </div>
                     <div className="text-[8px] text-slate-400">
@@ -206,56 +165,27 @@ export function AssignmentMatrix() {
                     </span>
                   </td>
                   {sortedPeople.map((person) => {
-                    const pct = getCellPct(person.name, proj.id);
-                    const isEditing = editing?.person === person.name && editing?.projectId === proj.id;
+                    const assigned = isAssigned(person.name, proj.id);
 
                     return (
                       <td
                         key={person.name}
-                        onClick={() => !isEditing && handleCellClick(person.name, person.role_key, proj.id)}
+                        onClick={() => toggleAssignment(person.name, person.role_key, proj.id)}
                         className={cn(
                           "px-0.5 py-0.5 text-center cursor-pointer transition-colors",
-                          !isEditing && "hover:bg-indigo-50",
+                          "hover:bg-indigo-50",
                         )}
                       >
-                        {isEditing ? (
-                          <div className="flex items-center gap-0.5 justify-center">
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              step={5}
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onKeyDown={handleKeyDown}
-                              autoFocus
-                              className="w-11 rounded border border-indigo-300 bg-white px-0.5 py-0.5 text-center text-[10px] tabular-nums focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                            />
-                            <button onClick={handleSave} className="text-emerald-500 hover:text-emerald-700">
-                              <Check className="h-2.5 w-2.5" />
-                            </button>
-                            {editing.currentPct != null && (
-                              <button onClick={handleRemove} className="text-red-400 hover:text-red-600">
-                                <X className="h-2.5 w-2.5" />
-                              </button>
-                            )}
-                          </div>
-                        ) : pct != null ? (
-                          <div
-                            className={cn(
-                              "rounded py-0.5 text-[10px] font-medium tabular-nums",
-                              pct >= 0.8
-                                ? "bg-indigo-100 text-indigo-800"
-                                : pct >= 0.5
-                                  ? "bg-indigo-50 text-indigo-700"
-                                  : "bg-slate-100 text-slate-600",
-                            )}
-                          >
-                            {Math.round(pct * 100)}%
-                          </div>
-                        ) : (
-                          <div className="h-5 rounded" />
-                        )}
+                        <div
+                          className={cn(
+                            "flex h-6 w-full items-center justify-center rounded transition-colors",
+                            assigned
+                              ? "bg-indigo-100 text-indigo-700"
+                              : "bg-transparent",
+                          )}
+                        >
+                          {assigned && <Check className="h-3.5 w-3.5" />}
+                        </div>
                       </td>
                     );
                   })}
