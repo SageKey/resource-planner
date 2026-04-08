@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Plus, Trash2, Users, Briefcase, Calendar, Table } from "lucide-react";
+import { ChevronDown, Plus, Trash2, Users, Briefcase, Calendar } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { EditMemberDialog } from "@/components/roster/EditMemberDialog";
 import { PersonAvailabilityTable } from "@/components/roster/PersonAvailabilityTable";
@@ -32,7 +32,7 @@ type Tab = "teams" | "assignments" | "demand" | "availability";
 
 const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "teams", label: "Teams", icon: Users },
-  { key: "assignments", label: "Assignments", icon: Table },
+  { key: "assignments", label: "Assignments", icon: Users },
   { key: "demand", label: "Workload", icon: Briefcase },
   { key: "availability", label: "Availability", icon: Calendar },
 ];
