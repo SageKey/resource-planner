@@ -105,6 +105,7 @@ export interface PersonHeatmapRow {
   role: string;
   team: string;
   capacity_hrs_week: number;
+  include_in_capacity: boolean;
   cells: number[];
 }
 

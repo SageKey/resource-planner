@@ -312,20 +312,15 @@ def person_heatmap(
     for member in roster:
         pkey = member.name.strip().lower()
         capacity = member.project_capacity_hrs
-        if capacity <= 0:
-            continue
+        included = getattr(member, "include_in_capacity", True)
 
         weekly_demand = [0.0] * weeks
 
-        # Explicit assignments
-        assigned_pids = set()
-        for pid, rk, alloc_pct in person_assignments.get(pkey, []):
-            assigned_pids.add(pid)
-            for w in range(weeks):
-                weekly_demand[w] += project_role_weekly[pid][rk].get(w, 0.0) * alloc_pct
-
-        # No even-split fallback — person heatmap only shows demand
-        # from explicit assignments. Keeps person view accurate.
+        if included and capacity > 0:
+            # Explicit assignments
+            for pid, rk, alloc_pct in person_assignments.get(pkey, []):
+                for w in range(weeks):
+                    weekly_demand[w] += project_role_weekly[pid][rk].get(w, 0.0) * alloc_pct
 
         cells = [round(d / capacity, 4) if capacity > 0 else 0.0 for d in weekly_demand]
 
@@ -335,6 +330,7 @@ def person_heatmap(
             "role": member.role,
             "team": member.team or "Unassigned",
             "capacity_hrs_week": round(capacity, 2),
+            "include_in_capacity": included,
             "cells": cells,
         })
 

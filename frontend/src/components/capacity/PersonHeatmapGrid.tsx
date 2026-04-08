@@ -135,19 +135,24 @@ export function PersonHeatmapGrid({ data }: { data: PersonHeatmapResponse }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {group.people.map((person) => (
-                      <tr key={person.name}>
+                    {group.people.map((person) => {
+                      const excluded = person.include_in_capacity === false;
+                      return (
+                      <tr key={person.name} className={cn(excluded && "opacity-40")}>
                         <td className="sticky left-0 z-10 bg-white px-2 py-0.5">
                           <div className="flex items-center gap-1.5">
                             <div
                               className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[8px] font-semibold"
-                              style={{ backgroundColor: avatarTone(person.name) }}
+                              style={{ backgroundColor: excluded ? "#e2e8f0" : avatarTone(person.name) }}
                             >
                               {person.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                             </div>
-                            <span className="font-medium text-slate-700 truncate max-w-[100px]">
+                            <span className={cn("font-medium truncate max-w-[100px]", excluded ? "text-slate-400 italic" : "text-slate-700")}>
                               {person.name}
                             </span>
+                            {excluded && (
+                              <span className="text-[8px] text-slate-400 shrink-0">excluded</span>
+                            )}
                           </div>
                         </td>
                         {person.cells.map((util, i) => {
@@ -169,7 +174,8 @@ export function PersonHeatmapGrid({ data }: { data: PersonHeatmapResponse }) {
                           );
                         })}
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
