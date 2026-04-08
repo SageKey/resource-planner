@@ -713,10 +713,15 @@ class CapacityEngine:
             norm_weights = {p: w / weight_sum for p, w in raw_weights.items()}
 
             # Build boundaries from today (day 0 = today)
+            # The current phase gets a minimum of 7 days so it doesn't
+            # get squeezed below one week and disappear from the heatmap
             phase_boundaries = []
             cumulative = 0
+            min_current_phase_days = 7
             for phase in remaining_phases:
                 phase_days = round(remaining_days * norm_weights[phase])
+                if phase == proj_current_phase:
+                    phase_days = max(phase_days, min_current_phase_days)
                 phase_boundaries.append((phase, cumulative, cumulative + phase_days))
                 cumulative += phase_days
 
