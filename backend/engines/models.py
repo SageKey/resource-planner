@@ -146,6 +146,8 @@ class Project:
             return False
         if self.health and "PIPELINE" in self.health:
             return False
+        if self.health and "COMPLETE" in self.health and "INCOMPLETE" not in self.health:
+            return False
         if self.pct_complete >= 1.0:
             return False
         return True

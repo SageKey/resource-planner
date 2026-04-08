@@ -443,12 +443,14 @@ class CapacityEngine:
         """
         Calculate weekly demand for each role on a project.
 
+        Uses REMAINING hours (adjusted for % complete):
+            Remaining = Est.Hours × (1 - pct_complete)
+
         Average weekly demand:
-            Est.Hours × Role% × Role_Avg_Effort / Duration_weeks
+            Remaining × Role% × Role_Avg_Effort / Duration_weeks
 
         Phase-aware weekly demand (for each SDLC phase):
-            Est.Hours × Role% × Role_Phase_Effort / Duration_weeks
-            (mathematically, phase weights cancel out — see spec derivation)
+            Remaining × Role% × Role_Phase_Effort / Duration_weeks
 
         CRITICAL: Demand is ZERO if Role% == 0 (the allocation gate).
         """
@@ -456,6 +458,11 @@ class CapacityEngine:
         duration = project.duration_weeks
 
         if not duration or duration <= 0 or project.est_hours <= 0:
+            return demands
+
+        # Only count remaining work
+        remaining_hours = project.est_hours * (1.0 - min(project.pct_complete, 1.0))
+        if remaining_hours <= 0:
             return demands
 
         role_phase_efforts = self.assumptions.role_phase_efforts
@@ -471,7 +478,7 @@ class CapacityEngine:
 
             # Average weekly demand across all phases
             avg_effort = role_avg_efforts[role_key]
-            avg_weekly = project.est_hours * alloc_pct * avg_effort / duration
+            avg_weekly = remaining_hours * alloc_pct * avg_effort / duration
 
             # Phase-specific weekly demand
             phase_weekly = {}
@@ -479,7 +486,7 @@ class CapacityEngine:
                 for phase in SDLC_PHASES:
                     phase_effort = role_phase_efforts[role_key].get(phase, 0.0)
                     phase_weekly[phase] = (
-                        project.est_hours * alloc_pct * phase_effort / duration
+                        remaining_hours * alloc_pct * phase_effort / duration
                     )
 
             demands.append(RoleDemand(

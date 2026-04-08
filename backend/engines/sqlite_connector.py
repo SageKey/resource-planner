@@ -429,6 +429,8 @@ class SQLiteConnector:
         supply_by_role = {}
         role_members = defaultdict(list)
         for m in roster:
+            if not getattr(m, "include_in_capacity", True):
+                continue
             role_members[m.role_key].append(m)
 
         for role_key in ROLE_KEYS:
