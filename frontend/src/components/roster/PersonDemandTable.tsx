@@ -24,7 +24,8 @@ const STATUS_BG: Record<string, string> = {
 
 const ROLE_LABELS: Record<string, string> = {
   pm: "PM", ba: "BA", functional: "Functional", technical: "Technical",
-  developer: "Developer", infrastructure: "Infra", dba: "DBA", erp: "ERP",
+  developer: "Developer", infrastructure: "Infrastructure", dba: "DBA", erp: "ERP",
+  "wms consultant": "WMS Consultant",
 };
 
 interface DemandGroup {

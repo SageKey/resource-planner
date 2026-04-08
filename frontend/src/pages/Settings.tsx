@@ -23,9 +23,10 @@ const ROLE_LABELS: Record<string, string> = {
   functional: "Functional",
   technical: "Technical",
   developer: "Developer",
-  infrastructure: "Infra",
+  infrastructure: "Infrastructure",
   dba: "DBA",
   erp: "ERP",
+  "wms consultant": "WMS Consultant",
 };
 
 const PHASES = ["discovery", "planning", "design", "build", "test", "deploy"];

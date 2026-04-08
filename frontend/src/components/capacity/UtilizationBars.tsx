@@ -21,12 +21,13 @@ const STATUS_BG: Record<string, string> = {
 const ROLE_LABELS: Record<string, string> = {
   pm: "Project Manager",
   ba: "Business Analyst",
-  functional: "Functional Analyst",
-  technical: "Technical Analyst",
+  functional: "Functional",
+  technical: "Technical",
   developer: "Developer",
   infrastructure: "Infrastructure",
   dba: "DBA",
   erp: "ERP Consultant",
+  "wms consultant": "WMS Consultant",
 };
 
 interface Props {
