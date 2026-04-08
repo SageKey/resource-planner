@@ -63,11 +63,13 @@ export function PersonHeatmapGrid({ data }: { data: PersonHeatmapResponse }) {
       <h2 className="mb-4 text-sm font-semibold text-slate-700">
         Person-Level Heatmap
         <InfoTooltip>
-          <div className="font-semibold text-slate-800">How the Person Heatmap works</div>
-          <p>Each cell = <strong>person's weekly project demand / their project capacity</strong>.</p>
-          <p><strong>Only counts projects they're explicitly assigned to</strong> via the Assignments tab on the Roster page. Unassigned projects don't appear here.</p>
-          <p><strong>Project capacity</strong> = Weekly Hours × (1 - Support Reserve %). Support time is excluded — this only shows project utilization.</p>
-          <p>If a person shows 0% everywhere, they have no assignments yet. Assign them on the Roster → Assignments tab.</p>
+          <div className="font-semibold text-slate-800">Person Heatmap</div>
+          <p className="font-mono text-[10px] bg-slate-100 rounded px-2 py-1">Cell = Person_Weekly_Demand / Project_Capacity</p>
+          <p className="font-mono text-[10px] bg-slate-100 rounded px-2 py-1 mt-1">Project_Capacity = Weekly_Hrs × (1 - Support%)</p>
+          <p><strong>Only counts explicit assignments</strong> from the Assignments tab. Unassigned projects don't appear.</p>
+          <p><strong>SDLC phase-aware:</strong> Demand varies by phase. If a project has Current Phase set, phases rebuild from today using remaining phases only.</p>
+          <p><strong>Click any cell</strong> to see project breakdown for that person + week.</p>
+          <p className="text-slate-400">0% everywhere = no assignments yet. See Settings → Formulas for full detail.</p>
         </InfoTooltip>
       </h2>
 

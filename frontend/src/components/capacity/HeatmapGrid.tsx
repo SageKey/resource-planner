@@ -50,12 +50,13 @@ export function HeatmapGrid({ data }: Props) {
       <h2 className="mb-4 text-sm font-semibold text-slate-700">
         26-Week Capacity Heatmap
         <InfoTooltip>
-          <div className="font-semibold text-slate-800">How the Role Heatmap works</div>
-          <p>Each cell shows the <strong>utilization %</strong> for that role in that week. <strong>Click any cell</strong> to see which projects contribute.</p>
-          <p><strong>Demand per week</strong> varies by SDLC phase. During Build (heaviest phase), developers have high demand. During Discovery, BAs are busiest.</p>
-          <p>The phase distribution is configured on the <strong>Settings</strong> page under Phase Weights and Role-Phase Effort Matrix.</p>
-          <p><strong>This shows ALL project demand</strong> for the role — whether or not specific people are assigned.</p>
-          <p className="text-slate-400">Colors: empty=0%, green &lt;80%, yellow 80-99%, red 100-124%, dark red 125%+.</p>
+          <div className="font-semibold text-slate-800">Role Heatmap</div>
+          <p className="font-mono text-[10px] bg-slate-100 rounded px-2 py-1">Cell = Role_Total_Hrs × Phase_Effort% / Phase_Duration_Wks / Supply</p>
+          <p>Each cell = weekly demand for that role in that week, divided by supply.</p>
+          <p><strong>Demand varies by SDLC phase.</strong> Developers peak during Build, BAs during Discovery. Configured on Settings page.</p>
+          <p><strong>Current Phase override:</strong> If set on a project, phases rebuild from today forward using only remaining phases. Fixes demand showing in the wrong weeks for behind-schedule projects.</p>
+          <p><strong>Click any cell</strong> to see which projects contribute demand that week.</p>
+          <p className="text-slate-400">Colors: empty=0%, green &lt;80%, yellow 80-99%, red 100-124%, dark red 125%+. See Settings → Formulas for full detail.</p>
         </InfoTooltip>
       </h2>
 

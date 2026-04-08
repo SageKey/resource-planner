@@ -300,6 +300,13 @@ function FormulasReference() {
       />
 
       <FormulaCard
+        title="5b. Current Phase Override (Heatmap)"
+        formula="When current_phase is set: phases rebuild from TODAY → end_date using remaining phases only"
+        explanation={`By default, the engine guesses which SDLC phase a project is in based on the calendar (e.g., 70% through the timeline = Build). This can be wrong if a project is behind schedule.\n\nWhen you set the Current Phase on a project (Portfolio → Edit), the engine overrides the calendar:\n\n1. Only remaining phases (current + later) are used\n2. Phase boundaries are rebuilt from today to end_date\n3. Phase weights are renormalized so remaining phases fill the remaining time proportionally\n4. Role efforts are renormalized so total hours are preserved\n\nThis fixes the heatmap showing Build-phase developer demand when you're actually still in Planning. The total demand doesn't change — only which weeks it appears in.\n\nProjects without a current phase set continue using the calendar-based estimate.`}
+        example={`Example: ETE-83, current_phase = "planning"\n  End date: Jun 1 (~8 weeks from today)\n  Remaining phases: Planning → Design → Build → Test → Deploy\n\n  Before (calendar-based): Engine thinks we're in Build\n    → Developer demand high NOW (50% effort in Build)\n    → BA demand low NOW (10% effort in Build)\n\n  After (phase override): Engine knows we're in Planning\n    → Developer demand near zero NOW (5% effort in Planning)\n    → BA demand high NOW (20% effort in Planning)\n    → Developer demand spikes LATER when Build phase starts\n\n  Total hours unchanged — just shifted to the correct weeks.`}
+      />
+
+      <FormulaCard
         title="6. Person Demand"
         formula="Person_Weekly_Demand = Project_Role_Demand × Person_Allocation%"
         explanation="Person-level demand only counts projects they're explicitly assigned to via the Assignments tab. No even-split — if a person isn't assigned, they show zero demand from that project. This means person-level views are only as complete as your assignments."
