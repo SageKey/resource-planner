@@ -56,6 +56,19 @@ function healthStyle(h: string | null | undefined): string {
   return "bg-slate-100 text-slate-500";
 }
 
+const PHASE_STYLE: Record<string, string> = {
+  discovery: "bg-violet-100 text-violet-700",
+  planning: "bg-sky-100 text-sky-700",
+  design: "bg-indigo-100 text-indigo-700",
+  build: "bg-amber-100 text-amber-700",
+  test: "bg-teal-100 text-teal-700",
+  deploy: "bg-emerald-100 text-emerald-700",
+};
+
+function phaseStyle(phase: string): string {
+  return PHASE_STYLE[phase.toLowerCase()] ?? "bg-slate-100 text-slate-600";
+}
+
 function healthText(h: string | null | undefined): string {
   if (!h) return "Unknown";
   return h.replace(/^[^\w]*/, "").trim();
@@ -198,13 +211,13 @@ export function Portfolio() {
                       <th className="px-4 py-2">ID</th>
                       <th className="px-4 py-2">Name</th>
                       <th className="px-4 py-2">Health</th>
+                      <th className="px-4 py-2">Phase</th>
                       <th className="px-4 py-2">Priority</th>
                       <th className="px-4 py-2 text-right">Hours</th>
                       <th className="px-4 py-2">T-Shirt</th>
                       <th className="px-4 py-2">Start</th>
                       <th className="px-4 py-2">End</th>
                       <th className="px-4 py-2 text-right">% Done</th>
-                      <th className="px-4 py-2">Phase</th>
                       <th className="px-4 py-2 w-10" />
                     </tr>
                   </thead>
@@ -228,6 +241,15 @@ export function Portfolio() {
                             {healthText(p.health)}
                           </span>
                         </td>
+                        <td className="px-4 py-2.5">
+                          {(p as any).current_phase ? (
+                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${phaseStyle((p as any).current_phase)}`}>
+                              {(p as any).current_phase}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-300">{"\u2014"}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-2.5 text-slate-600">
                           {p.priority ?? "\u2014"}
                         </td>
@@ -245,9 +267,6 @@ export function Portfolio() {
                         </td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
                           {Math.round(p.pct_complete * 100)}%
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-500 capitalize text-xs">
-                          {(p as any).current_phase || "\u2014"}
                         </td>
                         <td className="px-4 py-2.5">
                           <button
