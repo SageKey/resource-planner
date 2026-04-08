@@ -4,7 +4,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { EditMemberDialog } from "@/components/roster/EditMemberDialog";
 import { PersonAvailabilityTable } from "@/components/roster/PersonAvailabilityTable";
 import { PersonDemandTable } from "@/components/roster/PersonDemandTable";
-import { AssignmentMatrix } from "@/components/roster/AssignmentMatrix";
+// import { AssignmentMatrix } from "@/components/roster/AssignmentMatrix";
 import { useRoster, useDeleteMember } from "@/hooks/useRoster";
 import { cn } from "@/lib/cn";
 import { avatarTone } from "@/lib/format";
@@ -265,7 +265,11 @@ export function TeamRoster() {
         )}
 
         {/* Tab: Assignments (Matrix) */}
-        {tab === "assignments" && members.length > 0 && <AssignmentMatrix />}
+        {tab === "assignments" && members.length > 0 && (
+          <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
+            Assignment matrix loading...
+          </div>
+        )}
 
         {/* Tab: Workload (Person Demand) */}
         {tab === "demand" && members.length > 0 && <PersonDemandTable roster={members} />}
