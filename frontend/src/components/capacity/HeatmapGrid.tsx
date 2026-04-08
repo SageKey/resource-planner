@@ -153,7 +153,7 @@ function CellDetail({
   weekIdx: number;
   onClose: () => void;
 }) {
-  const { data, isLoading } = useHeatmapDetail(roleKey, weekIdx);
+  const { data, isLoading, isError, error } = useHeatmapDetail(roleKey, weekIdx);
   const ref = useRef<HTMLDivElement>(null);
 
   return (
@@ -172,6 +172,12 @@ function CellDetail({
 
       {isLoading && (
         <div className="text-xs text-slate-400">Loading breakdown...</div>
+      )}
+
+      {isError && (
+        <div className="text-xs text-red-500">
+          Failed to load: {(error as Error)?.message ?? "Unknown error"}
+        </div>
       )}
 
       {data && (
