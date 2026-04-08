@@ -44,9 +44,11 @@ const ROLE_LABELS: Record<string, string> = {
 interface Props {
   roles: Record<string, RoleUtilizationOut>;
   coverage?: Record<string, RoleCoverage> | null;
+  /** assignments[project_id][person_name] = {role_key, allocation_pct} */
+  assignments?: Record<string, Record<string, { role_key: string; allocation_pct: number }>> | null;
 }
 
-export function UtilizationBars({ roles, coverage }: Props) {
+export function UtilizationBars({ roles, coverage, assignments }: Props) {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
 
   if (!roles) return null;
@@ -200,26 +202,44 @@ export function UtilizationBars({ roles, coverage }: Props) {
                   <tr className="border-b border-slate-200 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                     <th className="pb-1.5 pr-3">Project</th>
                     <th className="pb-1.5 pr-3 text-right">Role Alloc</th>
-                    <th className="pb-1.5 text-right">Demand/wk</th>
+                    <th className="pb-1.5 pr-3 text-right">Demand/wk</th>
+                    <th className="pb-1.5 text-right">Staffed</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[...selectedData.demand_breakdown]
                     .sort((a, b) => b.weekly_hours - a.weekly_hours)
-                    .map((d) => (
-                      <tr key={d.project_id} className="border-b border-slate-50">
-                        <td className="py-1.5 pr-3">
-                          <span className="font-mono text-slate-400">{d.project_id}</span>{" "}
-                          <span className="font-medium text-slate-700">{d.project_name}</span>
-                        </td>
-                        <td className="py-1.5 pr-3 text-right tabular-nums text-slate-600">
-                          {Math.round(d.role_alloc_pct * 100)}%
-                        </td>
-                        <td className="py-1.5 text-right tabular-nums font-semibold text-slate-800">
-                          {d.weekly_hours.toFixed(1)}h
-                        </td>
-                      </tr>
-                    ))}
+                    .map((d) => {
+                      const projAssigns = assignments?.[d.project_id] ?? {};
+                      const hasAssignment = Object.values(projAssigns).some(
+                        (a) => a.role_key === selectedData.role_key,
+                      );
+                      return (
+                        <tr key={d.project_id} className="border-b border-slate-50">
+                          <td className="py-1.5 pr-3">
+                            <span className="font-mono text-slate-400">{d.project_id}</span>{" "}
+                            <span className="font-medium text-slate-700">{d.project_name}</span>
+                          </td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums text-slate-600">
+                            {Math.round(d.role_alloc_pct * 100)}%
+                          </td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums font-semibold text-slate-800">
+                            {d.weekly_hours.toFixed(1)}h
+                          </td>
+                          <td className="py-1.5 text-right">
+                            {hasAssignment ? (
+                              <span className="inline-block rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
+                                Assigned
+                              </span>
+                            ) : (
+                              <span className="inline-block rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-medium text-red-500">
+                                Unassigned
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             ) : (

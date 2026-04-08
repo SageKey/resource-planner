@@ -11,6 +11,17 @@ import type { Project } from "@/types/project";
 // Health grouping
 // ---------------------------------------------------------------------------
 
+const ROLE_DOTS = [
+  { key: "pm", short: "PM", label: "Project Manager" },
+  { key: "ba", short: "BA", label: "Business Analyst" },
+  { key: "functional", short: "FN", label: "Functional" },
+  { key: "technical", short: "TC", label: "Technical" },
+  { key: "developer", short: "DV", label: "Developer" },
+  { key: "infrastructure", short: "IN", label: "Infrastructure" },
+  { key: "dba", short: "DB", label: "DBA" },
+  { key: "erp", short: "ER", label: "ERP" },
+];
+
 const GROUP_ORDER = [
   { key: "on_track", label: "On Track", icon: "\u{1f7e2}", headerColor: "text-emerald-700" },
   { key: "needs_spec", label: "Needs Spec", icon: "\u{1f535}", headerColor: "text-blue-700" },
@@ -231,8 +242,22 @@ export function Portfolio() {
                         <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
                           {p.id}
                         </td>
-                        <td className="px-4 py-2.5 font-medium text-slate-800">
-                          {p.name}
+                        <td className="px-4 py-2.5">
+                          <div className="font-medium text-slate-800">{p.name}</div>
+                          <div className="mt-0.5 flex gap-1">
+                            {ROLE_DOTS.map((r) => {
+                              const alloc = p.role_allocations?.[r.key] ?? 0;
+                              return alloc > 0 ? (
+                                <span
+                                  key={r.key}
+                                  title={`${r.label} ${Math.round(alloc * 100)}%`}
+                                  className="inline-block rounded px-1 py-0 text-[8px] font-semibold bg-slate-100 text-slate-500"
+                                >
+                                  {r.short}
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
                         </td>
                         <td className="px-4 py-2.5">
                           <span

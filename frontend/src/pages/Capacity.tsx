@@ -3,10 +3,12 @@ import { UtilizationBars } from "@/components/capacity/UtilizationBars";
 import { HeatmapGrid } from "@/components/capacity/HeatmapGrid";
 import { PersonHeatmapGrid } from "@/components/capacity/PersonHeatmapGrid";
 import { useHeatmap, useUtilization, usePersonHeatmap, useAssignmentCoverage } from "@/hooks/useCapacity";
+import { useAssignmentMatrix } from "@/hooks/useAssignments";
 
 export function Capacity() {
   const util = useUtilization();
   const coverage = useAssignmentCoverage();
+  const matrix = useAssignmentMatrix();
   const heat = useHeatmap(26);
   const personHeat = usePersonHeatmap(26);
 
@@ -19,7 +21,7 @@ export function Capacity() {
       <div className="space-y-6 p-8">
         {util.isLoading && <LoadingCard text="Computing utilization..." />}
         {util.isError && <ErrorCard err={util.error as Error} />}
-        {util.data?.roles && <UtilizationBars roles={util.data.roles} coverage={coverage.data} />}
+        {util.data?.roles && <UtilizationBars roles={util.data.roles} coverage={coverage.data} assignments={matrix.data?.assignments} />}
 
         {heat.isLoading && <LoadingCard text="Building heatmap..." />}
         {heat.isError && <ErrorCard err={heat.error as Error} />}
