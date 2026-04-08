@@ -131,6 +131,87 @@ def heatmap_detail(
     }
 
 
+@router.get("/person-heatmap-detail")
+def person_heatmap_detail(
+    person_name: str = Query(...),
+    week_idx: int = Query(..., ge=0),
+    engine: CapacityEngine = Depends(get_capacity),
+):
+    """Return project-by-project breakdown for a specific person + week cell."""
+    data = engine._load()
+    active = data["active_portfolio"]
+    roster = data["roster"]
+    assignments = data.get("assignments", [])
+
+    today = date.today()
+    days_to_monday = (7 - today.weekday()) % 7
+    scan_start = today + timedelta(days=days_to_monday if days_to_monday else 0)
+    week_start = scan_start + timedelta(weeks=week_idx)
+    week_label = week_start.strftime("%b %d")
+
+    # Find the person
+    member = None
+    for m in roster:
+        if m.name == person_name:
+            member = m
+            break
+    if not member:
+        return {"person_name": person_name, "week_label": week_label, "projects": [], "error": "Person not found"}
+
+    capacity = member.project_capacity_hrs
+
+    # Get this person's assignments
+    person_key = person_name.strip().lower()
+    person_assignments = [(a.project_id, a.role_key, a.allocation_pct)
+                          for a in assignments if a.person_name.strip().lower() == person_key]
+
+    # Build weekly demand per project for this person
+    projects = []
+    total_demand = 0.0
+
+    for pid, rk, alloc_pct in person_assignments:
+        project = None
+        for p in active:
+            if p.id == pid:
+                project = p
+                break
+        if not project:
+            continue
+
+        timeline = engine.compute_weekly_demand_timeline(project)
+        snapshots = timeline.get(rk, [])
+        for snap in snapshots:
+            delta_days = (snap.week_start - scan_start).days
+            if delta_days < 0:
+                continue
+            idx = delta_days // 7
+            if idx == week_idx:
+                person_hrs = snap.role_demand_hrs * alloc_pct
+                if person_hrs > 0.01:
+                    projects.append({
+                        "project_id": project.id,
+                        "project_name": project.name,
+                        "role_key": rk,
+                        "phase": snap.phase_name,
+                        "allocation_pct": alloc_pct,
+                        "demand_hrs": round(person_hrs, 2),
+                    })
+                    total_demand += person_hrs
+
+    util = total_demand / capacity if capacity > 0 else 0.0
+    projects.sort(key=lambda p: -p["demand_hrs"])
+
+    return {
+        "person_name": person_name,
+        "week_idx": week_idx,
+        "week_label": week_label,
+        "capacity_hrs": round(capacity, 1),
+        "total_demand_hrs": round(total_demand, 1),
+        "utilization_pct": round(util, 4),
+        "projects": projects,
+    }
+
+
 @router.get("/assignment-coverage")
 def assignment_coverage(
     engine: CapacityEngine = Depends(get_capacity),
