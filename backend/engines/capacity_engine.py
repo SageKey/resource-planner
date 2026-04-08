@@ -692,30 +692,54 @@ class CapacityEngine:
             phase_boundaries.append((phase, cumulative, cumulative + phase_days))
             cumulative += phase_days
 
+        # Compute phase durations in weeks for correct per-week demand
+        phase_duration_weeks = {}
+        for phase_name, start_day, end_day in phase_boundaries:
+            phase_days = end_day - start_day
+            phase_duration_weeks[phase_name] = max(phase_days / 7.0, 0.5)
+
+        # Only count remaining work
+        remaining_hours = project.est_hours * (1.0 - min(project.pct_complete, 1.0))
+        if remaining_hours <= 0:
+            return {}
+
+        role_phase_efforts = self.assumptions.role_phase_efforts
+
         # Generate weekly snapshots for each role
         role_timelines = defaultdict(list)
-        demands = self.compute_project_role_demand(project)
 
-        for demand in demands:
+        for role_key, alloc_pct in project.role_allocations.items():
+            if alloc_pct <= 0 or role_key not in role_phase_efforts:
+                continue
+
+            role_total_hrs = remaining_hours * alloc_pct
+
+            # Pre-compute weekly demand per phase:
+            # role_hours_in_phase / phase_duration_weeks
+            phase_weekly_demand = {}
+            for phase_name in SDLC_PHASES:
+                effort = role_phase_efforts[role_key].get(phase_name, 0.0)
+                phase_hrs = role_total_hrs * effort
+                phase_wks = phase_duration_weeks.get(phase_name, 1.0)
+                phase_weekly_demand[phase_name] = phase_hrs / phase_wks
+
             current = project.start_date
             while current < project.end_date:
                 week_end = min(current + timedelta(days=7), project.end_date)
                 day_offset = (current - project.start_date).days
 
                 # Determine which phase this week falls in
-                current_phase = SDLC_PHASES[-1]  # default to last
+                current_phase = SDLC_PHASES[-1]
                 for phase_name, start_day, end_day in phase_boundaries:
                     if start_day <= day_offset < end_day:
                         current_phase = phase_name
                         break
 
-                phase_demand = demand.phase_weekly_hours.get(current_phase, 0.0)
-
-                role_timelines[demand.role_key].append(WeeklySnapshot(
+                role_timelines[role_key].append(WeeklySnapshot(
                     week_start=current,
                     week_end=week_end,
                     phase_name=current_phase,
-                    role_demand_hrs=phase_demand,
+                    role_demand_hrs=phase_weekly_demand.get(current_phase, 0.0),
                 ))
 
                 current = week_end
