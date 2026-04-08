@@ -70,11 +70,22 @@ function blank(): FormState {
   };
 }
 
+function matchHealth(h: string | null): string {
+  if (!h) return "\u26aa NOT STARTED";
+  const up = h.toUpperCase();
+  for (const opt of HEALTH_OPTIONS) {
+    // Match on the text portion, ignoring emoji prefix
+    const optText = opt.value.replace(/^[^\w]*/, "").trim().toUpperCase();
+    if (up.includes(optText)) return opt.value;
+  }
+  return "\u26aa NOT STARTED";
+}
+
 function fromProject(p: Project): FormState {
   return {
     id: p.id,
     name: p.name,
-    health: p.health ?? "\u26aa NOT STARTED",
+    health: matchHealth(p.health),
     priority: p.priority ?? "Medium",
     pct_complete: Math.round(p.pct_complete * 100).toString(),
     est_hours: (p.est_hours || 0).toString(),
