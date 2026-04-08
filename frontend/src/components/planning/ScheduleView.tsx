@@ -9,7 +9,6 @@ import {
   Loader2,
   Activity,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -273,12 +272,9 @@ function InFlightRow({
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <Link
-            to={`/portfolio/${p.project_id}`}
-            className="truncate text-sm font-semibold text-slate-800 hover:text-navy-700"
-          >
+          <span className="truncate text-sm font-semibold text-slate-800">
             {p.project_name}
-          </Link>
+          </span>
           <span
             className={cn(
               "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
