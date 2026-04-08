@@ -1,11 +1,13 @@
 import { TopBar } from "@/components/layout/TopBar";
 import { UtilizationBars } from "@/components/capacity/UtilizationBars";
 import { HeatmapGrid } from "@/components/capacity/HeatmapGrid";
-import { useHeatmap, useUtilization } from "@/hooks/useCapacity";
+import { PersonHeatmapGrid } from "@/components/capacity/PersonHeatmapGrid";
+import { useHeatmap, useUtilization, usePersonHeatmap } from "@/hooks/useCapacity";
 
 export function Capacity() {
   const util = useUtilization();
   const heat = useHeatmap(26);
+  const personHeat = usePersonHeatmap(26);
 
   return (
     <>
@@ -21,6 +23,10 @@ export function Capacity() {
         {heat.isLoading && <LoadingCard text="Building heatmap..." />}
         {heat.isError && <ErrorCard err={heat.error as Error} />}
         {heat.data?.rows && <HeatmapGrid data={heat.data} />}
+
+        {personHeat.isLoading && <LoadingCard text="Building person heatmap..." />}
+        {personHeat.isError && <ErrorCard err={personHeat.error as Error} />}
+        {personHeat.data?.people && <PersonHeatmapGrid data={personHeat.data} />}
       </div>
     </>
   );

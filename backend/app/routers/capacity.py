@@ -72,3 +72,101 @@ def heatmap(
         )
 
     return HeatmapResponse(weeks=week_labels, rows=rows)
+
+
+@router.get("/person-heatmap")
+def person_heatmap(
+    weeks: int = Query(26, ge=1, le=104),
+    engine: CapacityEngine = Depends(get_capacity),
+):
+    """Per-person weekly utilization heatmap.
+
+    For each team member, computes weekly demand from all their active
+    projects (using even-split fallback for unassigned project-roles),
+    divided by their personal project capacity.
+    """
+    data = engine._load()
+    active = data["active_portfolio"]
+    roster = data["roster"]
+    assignments = data.get("assignments", [])
+
+    today = date.today()
+    days_to_monday = (7 - today.weekday()) % 7
+    scan_start = today + timedelta(days=days_to_monday if days_to_monday else 0)
+
+    # Build assignment index: (project_id, role_key) -> set of person names
+    assigned_pr = defaultdict(set)
+    person_assignments = defaultdict(list)  # person -> [(project_id, role_key, alloc_pct)]
+    for a in assignments:
+        assigned_pr[(a.project_id, a.role_key)].add(a.person_name.strip().lower())
+        person_assignments[a.person_name.strip().lower()].append(
+            (a.project_id, a.role_key, a.allocation_pct)
+        )
+
+    # Count people per role for even-split fallback
+    role_people = defaultdict(list)
+    for m in roster:
+        if getattr(m, "include_in_capacity", True):
+            role_people[m.role_key].append(m.name.strip().lower())
+
+    # Build weekly demand per project per role
+    # project_role_weekly[project_id][role_key][week_idx] = demand_hrs
+    project_role_weekly: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    for project in active:
+        timeline = engine.compute_weekly_demand_timeline(project)
+        for role_key, snapshots in timeline.items():
+            for snap in snapshots:
+                delta_days = (snap.week_start - scan_start).days
+                week_idx = 0 if delta_days < 0 else delta_days // 7
+                if 0 <= week_idx < weeks:
+                    project_role_weekly[project.id][role_key][week_idx] += snap.role_demand_hrs
+
+    # For each person, compute their weekly demand
+    person_rows = []
+    for member in roster:
+        pkey = member.name.strip().lower()
+        capacity = member.project_capacity_hrs
+        if capacity <= 0:
+            continue
+
+        weekly_demand = [0.0] * weeks
+
+        # Explicit assignments
+        assigned_pids = set()
+        for pid, rk, alloc_pct in person_assignments.get(pkey, []):
+            assigned_pids.add(pid)
+            for w in range(weeks):
+                weekly_demand[w] += project_role_weekly[pid][rk].get(w, 0.0) * alloc_pct
+
+        # Even-split fallback for unassigned project-roles
+        if getattr(member, "include_in_capacity", True):
+            for project in active:
+                for role_key in project_role_weekly[project.id]:
+                    if role_key != member.role_key:
+                        continue
+                    if (project.id, role_key) in assigned_pr:
+                        continue  # has explicit assignments
+                    n_people = len(role_people.get(role_key, []))
+                    if n_people > 0:
+                        for w in range(weeks):
+                            weekly_demand[w] += project_role_weekly[project.id][role_key].get(w, 0.0) / n_people
+
+        cells = [round(d / capacity, 4) if capacity > 0 else 0.0 for d in weekly_demand]
+
+        person_rows.append({
+            "name": member.name,
+            "role_key": member.role_key,
+            "role": member.role,
+            "team": member.team or "Unassigned",
+            "capacity_hrs_week": round(capacity, 2),
+            "cells": cells,
+        })
+
+    # Sort by team, then name
+    person_rows.sort(key=lambda r: (r["team"], r["name"]))
+
+    week_labels: List[str] = [
+        (scan_start + timedelta(weeks=i)).strftime("%b %d") for i in range(weeks)
+    ]
+
+    return {"weeks": week_labels, "people": person_rows}
