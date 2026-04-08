@@ -42,90 +42,79 @@ export function UtilizationBars({ roles, coverage }: Props) {
     (a, b) => b.utilization_pct - a.utilization_pct,
   );
 
+  const hasCoverage = !!coverage;
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6">
       <h2 className="mb-4 text-sm font-semibold text-slate-700">
         Role Utilization
       </h2>
-      <div className="space-y-4">
-        {sorted.map((role, i) => {
-          const pct = Math.min(role.utilization_pct, 2.0);
-          const widthPct = Math.min(pct * 50, 100);
-          const barColor = STATUS_COLOR[role.status] ?? "bg-slate-400";
-          const bgColor = STATUS_BG[role.status] ?? "bg-slate-50";
+      <table className="w-full">
+        <thead>
+          <tr className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            <th className="pb-2 text-left w-28">Role</th>
+            <th className="pb-2 text-left">Utilization</th>
+            <th className="pb-2 text-right w-14">Util %</th>
+            <th className="pb-2 text-right w-16">Demand</th>
+            <th className="pb-2 text-right w-16">Supply</th>
+            {hasCoverage && (
+              <>
+                <th className="pb-2 text-right w-18">Assigned</th>
+                <th className="pb-2 text-right w-20">Unassigned</th>
+              </>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((role, i) => {
+            const pct = Math.min(role.utilization_pct, 2.0);
+            const widthPct = Math.min(pct * 50, 100);
+            const barColor = STATUS_COLOR[role.status] ?? "bg-slate-400";
+            const bgColor = STATUS_BG[role.status] ?? "bg-slate-50";
 
-          const cov = coverage?.[role.role_key];
-          const assignedHrs = cov?.assigned_hrs_week ?? 0;
-          const unassignedHrs = cov?.unassigned_hrs_week ?? 0;
-          const totalDemand = assignedHrs + unassignedHrs;
-          const assignedWidth = totalDemand > 0 ? (assignedHrs / totalDemand) * 100 : 0;
+            const cov = coverage?.[role.role_key];
+            const assignedHrs = cov?.assigned_hrs_week ?? 0;
+            const unassignedHrs = cov?.unassigned_hrs_week ?? 0;
 
-          return (
-            <div key={role.role_key}>
-              {/* Main utilization bar */}
-              <div className="flex items-center gap-3">
-                <div className="w-32 shrink-0 text-right text-xs font-medium text-slate-600">
+            return (
+              <tr key={role.role_key} className="border-t border-slate-50">
+                <td className="py-2 pr-3 text-xs font-medium text-slate-600">
                   {ROLE_LABELS[role.role_key] ?? role.role_key}
-                </div>
-                <div className={cn("relative h-6 flex-1 rounded-full", bgColor)}>
-                  <motion.div
-                    className={cn("absolute inset-y-0 left-0 rounded-full", barColor)}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${widthPct}%` }}
-                    transition={{ duration: 0.6, delay: i * 0.05, ease: "easeOut" }}
-                  />
-                </div>
-                <div className="w-20 shrink-0 text-right tabular-nums">
-                  <span className="text-xs font-semibold text-slate-700">
-                    {Math.round(role.utilization_pct * 100)}%
-                  </span>
-                  <span className="ml-1 text-[10px] text-slate-400">
-                    {role.demand_hrs_week.toFixed(0)}/{role.supply_hrs_week.toFixed(0)}h
-                  </span>
-                </div>
-              </div>
-
-              {/* Assigned vs unassigned sub-bar */}
-              {cov && totalDemand > 0 && (
-                <div className="flex items-center gap-3 mt-1">
-                  <div className="w-32 shrink-0" />
-                  <div className="relative h-2 flex-1 rounded-full bg-slate-100">
-                    <div
-                      className="absolute inset-y-0 left-0 rounded-full bg-indigo-400 transition-all"
-                      style={{ width: `${Math.min(assignedWidth, 100)}%` }}
+                </td>
+                <td className="py-2 pr-3">
+                  <div className={cn("relative h-5 rounded-full", bgColor)}>
+                    <motion.div
+                      className={cn("absolute inset-y-0 left-0 rounded-full", barColor)}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${widthPct}%` }}
+                      transition={{ duration: 0.6, delay: i * 0.05, ease: "easeOut" }}
                     />
                   </div>
-                  <div className="w-20 shrink-0 text-right">
-                    <span className="text-[10px] tabular-nums text-indigo-600 font-medium">
+                </td>
+                <td className="py-2 text-right text-xs font-semibold tabular-nums text-slate-700">
+                  {Math.round(role.utilization_pct * 100)}%
+                </td>
+                <td className="py-2 text-right text-xs tabular-nums text-slate-600">
+                  {role.demand_hrs_week.toFixed(0)}h
+                </td>
+                <td className="py-2 text-right text-xs tabular-nums text-slate-600">
+                  {role.supply_hrs_week.toFixed(0)}h
+                </td>
+                {hasCoverage && (
+                  <>
+                    <td className="py-2 text-right text-xs tabular-nums font-medium text-indigo-600">
                       {assignedHrs.toFixed(0)}h
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {" / "}
-                    </span>
-                    <span className="text-[10px] tabular-nums text-slate-400">
+                    </td>
+                    <td className="py-2 text-right text-xs tabular-nums text-slate-400">
                       {unassignedHrs.toFixed(0)}h
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Legend for sub-bars */}
-      {coverage && (
-        <div className="mt-4 flex items-center gap-4 text-[10px] text-slate-400">
-          <span className="flex items-center gap-1">
-            <span className="inline-block h-2 w-4 rounded-full bg-indigo-400" />
-            Assigned
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block h-2 w-4 rounded-full bg-slate-100" />
-            Unassigned
-          </span>
-        </div>
-      )}
+                    </td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
