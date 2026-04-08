@@ -59,7 +59,7 @@ export function useCreateAssignment() {
       allocation_pct: number;
     }) => api.post(`/assignments/${projectId}`, payload).then((r) => r.data),
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["assignments", vars.projectId] });
+      qc.invalidateQueries({ queryKey: ["assignments"] });
       qc.invalidateQueries({ queryKey: ["roster"] });
       qc.invalidateQueries({ queryKey: ["capacity"] });
     },
@@ -84,7 +84,7 @@ export function useDeleteAssignment() {
         })
         .then((r) => r.data),
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["assignments", vars.projectId] });
+      qc.invalidateQueries({ queryKey: ["assignments"] });
       qc.invalidateQueries({ queryKey: ["roster"] });
       qc.invalidateQueries({ queryKey: ["capacity"] });
     },

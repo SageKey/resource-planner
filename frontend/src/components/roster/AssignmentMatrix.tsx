@@ -75,6 +75,7 @@ export function AssignmentMatrix() {
   };
 
   const toggleAssignment = (personName: string, roleKey: string, projectId: string) => {
+    if (createAssignment.isPending || deleteAssignment.isPending) return;
     if (isAssigned(personName, projectId)) {
       deleteAssignment.mutate({
         projectId,
@@ -165,26 +166,26 @@ export function AssignmentMatrix() {
                     </span>
                   </td>
                   {sortedPeople.map((person) => {
-                    const assigned = isAssigned(person.name, proj.id);
+                    const hasAssignment = isAssigned(person.name, proj.id);
 
                     return (
                       <td
                         key={person.name}
-                        onClick={() => toggleAssignment(person.name, person.role_key, proj.id)}
-                        className={cn(
-                          "px-0.5 py-0.5 text-center cursor-pointer transition-colors",
-                          "hover:bg-indigo-50",
-                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleAssignment(person.name, person.role_key, proj.id);
+                        }}
+                        className="px-0.5 py-0.5 text-center cursor-pointer hover:bg-indigo-50 transition-colors"
                       >
                         <div
                           className={cn(
                             "flex h-6 w-full items-center justify-center rounded transition-colors",
-                            assigned
+                            hasAssignment
                               ? "bg-indigo-100 text-indigo-700"
-                              : "bg-transparent",
+                              : "hover:bg-slate-100",
                           )}
                         >
-                          {assigned && <Check className="h-3.5 w-3.5" />}
+                          {hasAssignment && <Check className="h-3.5 w-3.5" />}
                         </div>
                       </td>
                     );
