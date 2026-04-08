@@ -625,6 +625,42 @@ class SQLiteConnector:
         except Exception as e:
             return f"Error saving assignment: {e}"
 
+    def read_project_assignments(self, project_id: str) -> list[ProjectAssignment]:
+        conn = self._open()
+        rows = conn.execute(
+            "SELECT * FROM project_assignments WHERE project_id = ?", (project_id,)
+        ).fetchall()
+        return [
+            ProjectAssignment(
+                project_id=r["project_id"],
+                person_name=r["person_name"],
+                role_key=r["role_key"],
+                allocation_pct=r["allocation_pct"] or 1.0,
+            )
+            for r in rows
+        ]
+
+    def delete_assignment(self, project_id: str, person_name: str, role_key: str) -> Optional[str]:
+        try:
+            conn = self._open()
+            conn.execute(
+                "DELETE FROM project_assignments WHERE project_id = ? AND person_name = ? AND role_key = ?",
+                (project_id, person_name, role_key),
+            )
+            conn.commit()
+            return None
+        except Exception as e:
+            return f"Error deleting assignment: {e}"
+
+    def delete_project_assignments(self, project_id: str) -> Optional[str]:
+        try:
+            conn = self._open()
+            conn.execute("DELETE FROM project_assignments WHERE project_id = ?", (project_id,))
+            conn.commit()
+            return None
+        except Exception as e:
+            return f"Error deleting assignments: {e}"
+
     def delete_project(self, project_id: str) -> Optional[str]:
         try:
             conn = self._open()
