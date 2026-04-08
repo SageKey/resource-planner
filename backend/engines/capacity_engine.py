@@ -672,6 +672,11 @@ class CapacityEngine:
         """
         For a project with dates, compute week-by-week demand per role,
         with each week tagged to its SDLC phase.
+
+        If the project has current_phase set, phase boundaries are rebuilt
+        from TODAY forward using only the remaining phases (current + later).
+        This prevents the heatmap from showing Build-phase demand when the
+        project is actually still in Planning.
         """
         if not project.start_date or not project.end_date:
             return {}
@@ -682,17 +687,56 @@ class CapacityEngine:
         if duration_days <= 0:
             return {}
 
-        # Determine phase boundaries
         phase_weights = self.assumptions.sdlc_phase_weights
-        phase_boundaries = []  # (phase_name, start_day, end_day)
-        cumulative = 0
-        for phase in SDLC_PHASES:
-            weight = phase_weights.get(phase, 0.0)
-            phase_days = round(duration_days * weight)
-            phase_boundaries.append((phase, cumulative, cumulative + phase_days))
-            cumulative += phase_days
+        proj_current_phase = getattr(project, "current_phase", None)
 
-        # Compute phase durations in weeks for correct per-week demand
+        # Determine which phases are remaining
+        if proj_current_phase and proj_current_phase in SDLC_PHASES:
+            # Only include current phase and later
+            phase_idx = SDLC_PHASES.index(proj_current_phase)
+            remaining_phases = SDLC_PHASES[phase_idx:]
+        else:
+            remaining_phases = SDLC_PHASES
+
+        # Build phase boundaries
+        # If current_phase is set, distribute remaining timeline across
+        # remaining phases proportionally from today forward
+        if proj_current_phase and proj_current_phase in SDLC_PHASES:
+            today = date.today()
+            remaining_days = max((project.end_date - today).days, 1)
+
+            # Normalize remaining phase weights to sum to 1.0
+            raw_weights = {p: phase_weights.get(p, 0.0) for p in remaining_phases}
+            weight_sum = sum(raw_weights.values())
+            if weight_sum <= 0:
+                weight_sum = 1.0
+            norm_weights = {p: w / weight_sum for p, w in raw_weights.items()}
+
+            # Build boundaries from today (day 0 = today)
+            phase_boundaries = []
+            cumulative = 0
+            for phase in remaining_phases:
+                phase_days = round(remaining_days * norm_weights[phase])
+                phase_boundaries.append((phase, cumulative, cumulative + phase_days))
+                cumulative += phase_days
+
+            # Timeline starts from today, not project start
+            timeline_start = today
+            timeline_end = project.end_date
+        else:
+            # Default: use full project timeline
+            phase_boundaries = []
+            cumulative = 0
+            for phase in SDLC_PHASES:
+                weight = phase_weights.get(phase, 0.0)
+                phase_days = round(duration_days * weight)
+                phase_boundaries.append((phase, cumulative, cumulative + phase_days))
+                cumulative += phase_days
+
+            timeline_start = project.start_date
+            timeline_end = project.end_date
+
+        # Compute phase durations in weeks
         phase_duration_weeks = {}
         for phase_name, start_day, end_day in phase_boundaries:
             phase_days = end_day - start_day
@@ -705,6 +749,17 @@ class CapacityEngine:
 
         role_phase_efforts = self.assumptions.role_phase_efforts
 
+        # Renormalize role efforts for remaining phases only
+        # so that the total hours across remaining phases = role_total_hrs
+        role_remaining_efforts = {}
+        for role_key in role_phase_efforts:
+            efforts = {p: role_phase_efforts[role_key].get(p, 0.0) for p in remaining_phases}
+            effort_sum = sum(efforts.values())
+            if effort_sum > 0:
+                role_remaining_efforts[role_key] = {p: e / effort_sum for p, e in efforts.items()}
+            else:
+                role_remaining_efforts[role_key] = efforts
+
         # Generate weekly snapshots for each role
         role_timelines = defaultdict(list)
 
@@ -714,32 +769,31 @@ class CapacityEngine:
 
             role_total_hrs = remaining_hours * alloc_pct
 
-            # Pre-compute weekly demand per phase:
-            # role_hours_in_phase / phase_duration_weeks
+            # Weekly demand per phase using renormalized efforts
             phase_weekly_demand = {}
-            for phase_name in SDLC_PHASES:
-                effort = role_phase_efforts[role_key].get(phase_name, 0.0)
+            for phase_name in remaining_phases:
+                effort = role_remaining_efforts.get(role_key, {}).get(phase_name, 0.0)
                 phase_hrs = role_total_hrs * effort
                 phase_wks = phase_duration_weeks.get(phase_name, 1.0)
                 phase_weekly_demand[phase_name] = phase_hrs / phase_wks
 
-            current = project.start_date
-            while current < project.end_date:
-                week_end = min(current + timedelta(days=7), project.end_date)
-                day_offset = (current - project.start_date).days
+            current = timeline_start
+            while current < timeline_end:
+                week_end = min(current + timedelta(days=7), timeline_end)
+                day_offset = (current - timeline_start).days
 
                 # Determine which phase this week falls in
-                current_phase = SDLC_PHASES[-1]
+                current_phase_name = remaining_phases[-1]
                 for phase_name, start_day, end_day in phase_boundaries:
                     if start_day <= day_offset < end_day:
-                        current_phase = phase_name
+                        current_phase_name = phase_name
                         break
 
                 role_timelines[role_key].append(WeeklySnapshot(
                     week_start=current,
                     week_end=week_end,
-                    phase_name=current_phase,
-                    role_demand_hrs=phase_weekly_demand.get(current_phase, 0.0),
+                    phase_name=current_phase_name,
+                    role_demand_hrs=phase_weekly_demand.get(current_phase_name, 0.0),
                 ))
 
                 current = week_end
