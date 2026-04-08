@@ -105,12 +105,6 @@ def person_heatmap(
             (a.project_id, a.role_key, a.allocation_pct)
         )
 
-    # Count people per role for even-split fallback
-    role_people = defaultdict(list)
-    for m in roster:
-        if getattr(m, "include_in_capacity", True):
-            role_people[m.role_key].append(m.name.strip().lower())
-
     # Build weekly demand per project per role
     # project_role_weekly[project_id][role_key][week_idx] = demand_hrs
     project_role_weekly: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
@@ -142,18 +136,8 @@ def person_heatmap(
             for w in range(weeks):
                 weekly_demand[w] += project_role_weekly[pid][rk].get(w, 0.0) * alloc_pct
 
-        # Even-split fallback for unassigned project-roles
-        if getattr(member, "include_in_capacity", True):
-            for project in active:
-                for role_key in project_role_weekly[project.id]:
-                    if role_key != member.role_key:
-                        continue
-                    if (project.id, role_key) in assigned_pr:
-                        continue  # has explicit assignments
-                    n_people = len(role_people.get(role_key, []))
-                    if n_people > 0:
-                        for w in range(weeks):
-                            weekly_demand[w] += project_role_weekly[project.id][role_key].get(w, 0.0) / n_people
+        # No even-split fallback — person heatmap only shows demand
+        # from explicit assignments. Keeps person view accurate.
 
         cells = [round(d / capacity, 4) if capacity > 0 else 0.0 for d in weekly_demand]
 

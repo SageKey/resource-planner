@@ -604,14 +604,6 @@ class CapacityEngine:
             for demand in self.compute_project_role_demand(project):
                 project_role_demands[(project.id, demand.role_key)] = demand
 
-        # Roster members grouped by role. Only members with
-        # include_in_capacity=True participate in the even-split fallback
-        # denominator — excluded members don't absorb unassigned work.
-        role_members = defaultdict(list)
-        for m in roster:
-            if getattr(m, "include_in_capacity", True):
-                role_members[m.role_key].append(m)
-
         # Compute per person — iterate ALL roster (including excluded) so
         # they still appear on the Team Roster page with their stats.
         results = []
@@ -640,28 +632,10 @@ class CapacityEngine:
                     })
                     total_demand_hrs += person_hrs
 
-            # Fallback: even split for unassigned project-roles.
-            # Excluded members don't participate in the fallback denominator
-            # and don't receive fallback hours themselves.
-            if included:
-                for (pid, role_key), rd in project_role_demands.items():
-                    if role_key != member.role_key:
-                        continue
-                    if (pid, role_key) in assigned_project_roles:
-                        continue  # This project-role has explicit assignments
-                    # Split evenly across counted people in this role
-                    n_people = len(role_members.get(role_key, []))
-                    if n_people > 0:
-                        person_hrs = rd.weekly_hours / n_people
-                        demand_items.append({
-                            "project_id": pid,
-                            "project_name": rd.project_name,
-                            "role": role_key,
-                            "source": "even_split",
-                            "allocation_pct": f"{1/n_people:.0%}",
-                            "weekly_hours": round(person_hrs, 1),
-                        })
-                        total_demand_hrs += person_hrs
+            # No even-split fallback — person-level demand is driven
+            # exclusively by explicit assignments. Unassigned project-roles
+            # still show in role-level utilization but don't get distributed
+            # to individuals. This keeps person views accurate.
 
             capacity = member.project_capacity_hrs
             util_pct = total_demand_hrs / capacity if capacity > 0 else 0.0
