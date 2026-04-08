@@ -204,6 +204,7 @@ export function Portfolio() {
                       <th className="px-4 py-2">Start</th>
                       <th className="px-4 py-2">End</th>
                       <th className="px-4 py-2 text-right">% Done</th>
+                      <th className="px-4 py-2">Phase</th>
                       <th className="px-4 py-2 w-10" />
                     </tr>
                   </thead>
@@ -244,6 +245,9 @@ export function Portfolio() {
                         </td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
                           {Math.round(p.pct_complete * 100)}%
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-500 capitalize text-xs">
+                          {(p as any).current_phase || "\u2014"}
                         </td>
                         <td className="px-4 py-2.5">
                           <button
