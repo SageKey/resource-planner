@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Plus, Trash2, Users, Briefcase, Calendar } from "lucide-react";
+import { ChevronDown, Plus, Trash2, Users, Briefcase, Calendar, Grid3X3 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { EditMemberDialog } from "@/components/roster/EditMemberDialog";
 import { PersonAvailabilityTable } from "@/components/roster/PersonAvailabilityTable";
 import { PersonDemandTable } from "@/components/roster/PersonDemandTable";
+import { AssignmentMatrix } from "@/components/roster/AssignmentMatrix";
 import { useRoster, useDeleteMember } from "@/hooks/useRoster";
 import { cn } from "@/lib/cn";
 import { avatarTone } from "@/lib/format";
@@ -27,10 +28,11 @@ interface TeamGroup {
   totalCapacity: number;
 }
 
-type Tab = "teams" | "demand" | "availability";
+type Tab = "teams" | "assignments" | "demand" | "availability";
 
 const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: "teams", label: "Teams", icon: Users },
+  { key: "assignments", label: "Assignments", icon: Grid3X3 },
   { key: "demand", label: "Workload", icon: Briefcase },
   { key: "availability", label: "Availability", icon: Calendar },
 ];
@@ -261,6 +263,9 @@ export function TeamRoster() {
             )}
           </>
         )}
+
+        {/* Tab: Assignments (Matrix) */}
+        {tab === "assignments" && members.length > 0 && <AssignmentMatrix />}
 
         {/* Tab: Workload (Person Demand) */}
         {tab === "demand" && members.length > 0 && <PersonDemandTable roster={members} />}

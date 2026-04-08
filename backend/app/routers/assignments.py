@@ -1,6 +1,6 @@
 """Assignments router — manage person-to-project allocations."""
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -27,6 +27,56 @@ class AssignmentWrite(BaseModel):
 class AssignmentDelete(BaseModel):
     person_name: str
     role_key: str
+
+
+@router.get("/matrix")
+def assignment_matrix(
+    conn: SQLiteConnector = Depends(get_connector),
+):
+    """Return all data needed to render the assignment matrix:
+    active projects, roster members, and all assignments."""
+    portfolio = conn.read_active_portfolio()
+    roster = conn.read_roster()
+    assignments = conn.read_assignments(active_only=True)
+
+    # Build assignment lookup: {project_id: {person_name: {role_key, allocation_pct}}}
+    assignment_map: Dict[str, Dict[str, dict]] = {}
+    for a in assignments:
+        if a.project_id not in assignment_map:
+            assignment_map[a.project_id] = {}
+        assignment_map[a.project_id][a.person_name] = {
+            "role_key": a.role_key,
+            "allocation_pct": a.allocation_pct,
+        }
+
+    projects = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "health": p.health,
+            "priority": p.priority,
+            "est_hours": p.est_hours,
+        }
+        for p in portfolio
+    ]
+
+    people = [
+        {
+            "name": m.name,
+            "role": m.role,
+            "role_key": m.role_key,
+            "team": m.team or "Unassigned",
+            "capacity_hrs_week": m.project_capacity_hrs,
+        }
+        for m in roster
+        if m.include_in_capacity
+    ]
+
+    return {
+        "projects": projects,
+        "people": people,
+        "assignments": assignment_map,
+    }
 
 
 @router.get("/{project_id}", response_model=List[AssignmentOut])

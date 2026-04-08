@@ -8,6 +8,35 @@ export interface Assignment {
   allocation_pct: number;
 }
 
+export interface MatrixProject {
+  id: string;
+  name: string;
+  health: string | null;
+  priority: string | null;
+  est_hours: number;
+}
+
+export interface MatrixPerson {
+  name: string;
+  role: string;
+  role_key: string;
+  team: string;
+  capacity_hrs_week: number;
+}
+
+export interface MatrixData {
+  projects: MatrixProject[];
+  people: MatrixPerson[];
+  assignments: Record<string, Record<string, { role_key: string; allocation_pct: number }>>;
+}
+
+export function useAssignmentMatrix() {
+  return useQuery<MatrixData>({
+    queryKey: ["assignments", "matrix"],
+    queryFn: () => api.get("/assignments/matrix").then((r) => r.data),
+  });
+}
+
 export function useProjectAssignments(projectId: string | null) {
   return useQuery<Assignment[]>({
     queryKey: ["assignments", projectId],
