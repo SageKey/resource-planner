@@ -207,15 +207,16 @@ function PersonCellDetail({
   const { data, isLoading, isError, error } = usePersonHeatmapDetail(personName, weekIdx);
 
   return (
-    <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50/30 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-sm font-semibold text-slate-800">
-          {personName} — Week of {data?.week_label ?? "..."}
-        </div>
-        <button
-          onClick={onClose}
-          className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
-        >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-white p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-semibold text-slate-800">
+            {personName} — Week of {data?.week_label ?? "..."}
+          </div>
+          <button
+            onClick={onClose}
+            className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+          >
           Close
         </button>
       </div>
@@ -286,6 +287,7 @@ function PersonCellDetail({
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
