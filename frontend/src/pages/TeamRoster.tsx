@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { ChevronDown, Plus, Trash2, Users } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { EditMemberDialog } from "@/components/roster/EditMemberDialog";
+import { PersonAvailabilityTable } from "@/components/roster/PersonAvailabilityTable";
+import { PersonDemandTable } from "@/components/roster/PersonDemandTable";
 import { useRoster, useDeleteMember } from "@/hooks/useRoster";
 import { cn } from "@/lib/cn";
 import { avatarTone } from "@/lib/format";
@@ -221,6 +223,12 @@ export function TeamRoster() {
             )}
           </div>
         ))}
+        {/* Person Demand — who's on what */}
+        {members.length > 0 && <PersonDemandTable />}
+
+        {/* Person Availability — when is someone free */}
+        {members.length > 0 && <PersonAvailabilityTable />}
+
         {!isLoading && members.length === 0 && (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
             No team members found. Click "Add member" to get started.

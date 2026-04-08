@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import type { TeamMember, PersonDemand } from "@/types/roster";
+import type { TeamMember, PersonDemand, PersonAvailability } from "@/types/roster";
 
 export interface RosterMemberPayload {
   name: string;
@@ -26,6 +26,14 @@ export function usePersonDemand() {
   return useQuery<PersonDemand[]>({
     queryKey: ["roster", "demand"],
     queryFn: () => api.get("/roster/demand").then((r) => r.data),
+  });
+}
+
+export function usePersonAvailability(threshold = 0.5) {
+  return useQuery<PersonAvailability[]>({
+    queryKey: ["roster", "availability", threshold],
+    queryFn: () =>
+      api.get("/roster/availability", { params: { threshold } }).then((r) => r.data),
   });
 }
 
