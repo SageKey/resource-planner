@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ChevronDown, Users } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { avatarTone } from "@/lib/format";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import type { PersonHeatmapResponse } from "@/hooks/useCapacity";
 
 function cellColor(util: number): string {
@@ -45,6 +46,13 @@ export function PersonHeatmapGrid({ data }: { data: PersonHeatmapResponse }) {
     <div className="rounded-xl border border-slate-200 bg-white p-6">
       <h2 className="mb-4 text-sm font-semibold text-slate-700">
         Person-Level Heatmap
+        <InfoTooltip>
+          <div className="font-semibold text-slate-800">How the Person Heatmap works</div>
+          <p>Each cell = <strong>person's weekly project demand / their project capacity</strong>.</p>
+          <p><strong>Only counts projects they're explicitly assigned to</strong> via the Assignments tab on the Roster page. Unassigned projects don't appear here.</p>
+          <p><strong>Project capacity</strong> = Weekly Hours × (1 - Support Reserve %). Support time is excluded — this only shows project utilization.</p>
+          <p>If a person shows 0% everywhere, they have no assignments yet. Assign them on the Roster → Assignments tab.</p>
+        </InfoTooltip>
       </h2>
 
       {/* Legend */}

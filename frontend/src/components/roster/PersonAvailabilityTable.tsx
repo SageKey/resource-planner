@@ -3,6 +3,7 @@ import { ChevronDown, Clock, Users } from "lucide-react";
 import { usePersonAvailability } from "@/hooks/useRoster";
 import { cn } from "@/lib/cn";
 import { avatarTone, formatDate, relativeDate } from "@/lib/format";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import type { PersonAvailability, TeamMember } from "@/types/roster";
 
 const STATUS_DOT: Record<string, string> = {
@@ -75,6 +76,17 @@ export function PersonAvailabilityTable({ roster }: { roster: TeamMember[] }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center text-sm font-semibold text-slate-700">
+        Availability by Person
+        <InfoTooltip>
+          <div className="font-semibold text-slate-800">How Availability is calculated</div>
+          <p><strong>Available</strong> = utilization below 50% of project capacity.</p>
+          <p>The engine walks forward in time. As each assigned project reaches its end date, that project's demand is removed. The first date where utilization drops below the threshold = the available date.</p>
+          <p><strong>Available Now</strong> = currently under 50% utilization — has room for new work.</p>
+          <p><strong>Available Soon</strong> = will drop below 50% when a current project ends.</p>
+          <p><strong>Committed</strong> = no visibility into when they'll be free within the planning horizon.</p>
+        </InfoTooltip>
+      </div>
       {groups.map((group) => (
         <div key={group.team} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           {/* Team header */}

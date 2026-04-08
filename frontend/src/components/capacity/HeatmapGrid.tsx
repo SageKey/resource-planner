@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import type { HeatmapResponse } from "@/types/capacity";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -30,6 +31,14 @@ export function HeatmapGrid({ data }: Props) {
     <div className="rounded-xl border border-slate-200 bg-white p-6">
       <h2 className="mb-4 text-sm font-semibold text-slate-700">
         26-Week Capacity Heatmap
+        <InfoTooltip>
+          <div className="font-semibold text-slate-800">How the Role Heatmap works</div>
+          <p>Each cell shows the <strong>utilization %</strong> for that role in that week.</p>
+          <p><strong>Demand per week</strong> varies by SDLC phase. During Build (heaviest phase), developers have high demand. During Discovery, BAs are busiest.</p>
+          <p>The phase distribution is configured on the <strong>Settings</strong> page under Phase Weights and Role-Phase Effort Matrix.</p>
+          <p><strong>This shows ALL project demand</strong> for the role — whether or not specific people are assigned. It answers "do we have enough of this role type?"</p>
+          <p className="text-slate-400">Colors: empty=0%, green &lt;80%, yellow 80-99%, red 100-124%, dark red 125%+.</p>
+        </InfoTooltip>
       </h2>
 
       {/* Legend */}

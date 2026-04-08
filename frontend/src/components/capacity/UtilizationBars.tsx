@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/cn";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import type { RoleUtilizationOut } from "@/types/capacity";
 import type { RoleCoverage } from "@/hooks/useCapacity";
 
@@ -56,6 +57,16 @@ export function UtilizationBars({ roles, coverage }: Props) {
     <div className="rounded-xl border border-slate-200 bg-white p-6">
       <h2 className="mb-4 text-sm font-semibold text-slate-700">
         Role Utilization
+        <InfoTooltip>
+          <div className="font-semibold text-slate-800">How Role Utilization is calculated</div>
+          <p><strong>Util %</strong> = Total Demand / Supply</p>
+          <p><strong>Demand</strong> = For each active project: Remaining Hours × Role Allocation % / Duration Weeks. Summed across all active projects for that role.</p>
+          <p><strong>Remaining Hours</strong> = Est Hours × (1 - % Complete). A project 80% done only counts 20% of its hours.</p>
+          <p><strong>Supply</strong> = Sum of project capacity hours across all team members in that role. Project capacity = Weekly Hours × (1 - Support Reserve %).</p>
+          <p><strong>Assigned</strong> = Demand from projects where someone is explicitly assigned to this role (via Assignments tab).</p>
+          <p><strong>Unassigned</strong> = Demand from projects that need this role but have no person assigned yet.</p>
+          <p className="text-slate-400">Colors: green &lt;80%, yellow 80-99%, red &ge;100%.</p>
+        </InfoTooltip>
       </h2>
       <table className="w-full">
         <thead>

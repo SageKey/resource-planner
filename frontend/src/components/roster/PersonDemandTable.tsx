@@ -3,6 +3,7 @@ import { ChevronDown, FolderOpen, Users } from "lucide-react";
 import { usePersonDemand } from "@/hooks/useRoster";
 import { cn } from "@/lib/cn";
 import { avatarTone } from "@/lib/format";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import type { PersonDemand } from "@/types/roster";
 import type { TeamMember } from "@/types/roster";
 
@@ -87,6 +88,16 @@ export function PersonDemandTable({ roster }: { roster: TeamMember[] }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center text-sm font-semibold text-slate-700">
+        Workload by Person
+        <InfoTooltip>
+          <div className="font-semibold text-slate-800">How Workload is calculated</div>
+          <p><strong>Only counts explicit assignments</strong> — projects you've assigned this person to via the Assignments tab.</p>
+          <p><strong>Weekly hours</strong> = Project's Remaining Hours × Role Alloc % / Duration Weeks × Person's Allocation %.</p>
+          <p><strong>Utilization</strong> = Total weekly demand / Project capacity hrs. Project capacity = Weekly Hours × (1 - Support Reserve %).</p>
+          <p>If a person shows 0 demand, they have no assignments. Go to the Assignments tab to assign them.</p>
+        </InfoTooltip>
+      </div>
       {groups.map((group) => (
         <div key={group.team} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           {/* Team header */}

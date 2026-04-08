@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { TopBar } from "@/components/layout/TopBar";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import {
   useSdlc,
   useUpdatePhaseWeights,
@@ -86,6 +87,12 @@ export function Settings() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-slate-700">
                   Phase Weights
+                  <InfoTooltip>
+                    <div className="font-semibold text-slate-800">Phase Weights</div>
+                    <p>What <strong>percentage of the project timeline</strong> each SDLC phase occupies. Build at 40% means 40% of the project duration is spent in the Build phase.</p>
+                    <p>These weights determine how demand is distributed across weeks in the heatmap. A role heavy in Build will show higher demand during Build weeks.</p>
+                    <p>Must sum to 100%.</p>
+                  </InfoTooltip>
                   <span className={cn(
                     "ml-2 text-xs font-normal",
                     Math.abs(phaseWeightSum - 1.0) < 0.02 ? "text-emerald-600" : "text-red-500",
@@ -131,6 +138,13 @@ export function Settings() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-slate-700">
                   Role-Phase Effort Matrix
+                  <InfoTooltip>
+                    <div className="font-semibold text-slate-800">Role-Phase Effort Matrix</div>
+                    <p>What <strong>percentage of a role's total work</strong> happens in each SDLC phase.</p>
+                    <p>Example: Developer at 50% Build means half of all developer hours on a project are spent during the Build phase.</p>
+                    <p>This drives the heatmap's week-by-week variation — PMs are busier in Planning weeks, Developers are busiest in Build weeks.</p>
+                    <p>Each row must sum to 100%. Changes recalculate all capacity numbers immediately.</p>
+                  </InfoTooltip>
                 </h2>
                 <div className="flex gap-2">
                   <button
