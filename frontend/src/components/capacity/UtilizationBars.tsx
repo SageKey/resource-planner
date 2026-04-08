@@ -19,6 +19,14 @@ const STATUS_BG: Record<string, string> = {
   GREY: "bg-slate-50",
 };
 
+const STATUS_PILL: Record<string, string> = {
+  BLUE: "bg-sky-100 text-sky-700",
+  GREEN: "bg-emerald-100 text-emerald-700",
+  YELLOW: "bg-amber-100 text-amber-700",
+  RED: "bg-red-100 text-red-700",
+  GREY: "bg-slate-100 text-slate-500",
+};
+
 const ROLE_LABELS: Record<string, string> = {
   pm: "Project Manager",
   ba: "Business Analyst",
@@ -91,8 +99,13 @@ export function UtilizationBars({ roles, coverage }: Props) {
                     />
                   </div>
                 </td>
-                <td className="py-2 text-right text-xs font-semibold tabular-nums text-slate-700">
-                  {Math.round(role.utilization_pct * 100)}%
+                <td className="py-2 text-right">
+                  <span className={cn(
+                    "inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
+                    STATUS_PILL[role.status] ?? "bg-slate-100 text-slate-600",
+                  )}>
+                    {Math.round(role.utilization_pct * 100)}%
+                  </span>
                 </td>
                 <td className="py-2 text-right text-xs tabular-nums text-slate-600">
                   {role.demand_hrs_week.toFixed(0)}h
