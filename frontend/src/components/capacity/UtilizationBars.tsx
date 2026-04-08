@@ -64,14 +64,14 @@ export function UtilizationBars({ roles, coverage, assignments }: Props) {
       <h2 className="mb-4 text-sm font-semibold text-slate-700">
         Role Utilization
         <InfoTooltip>
-          <div className="font-semibold text-slate-800">How Role Utilization is calculated</div>
-          <p><strong>Util %</strong> = Total Demand / Supply</p>
-          <p><strong>Demand</strong> = For each active project: Remaining Hours × Role Allocation % / Duration Weeks. Summed across all active projects for that role.</p>
-          <p><strong>Remaining Hours</strong> = Est Hours × (1 - % Complete). A project 80% done only counts 20% of its hours.</p>
-          <p><strong>Supply</strong> = Sum of project capacity hours across all team members in that role. Project capacity = Weekly Hours × (1 - Support Reserve %).</p>
-          <p><strong>Assigned</strong> = Demand from projects with explicit person assignments.</p>
-          <p><strong>Unassigned</strong> = Demand from projects with no person assigned for this role.</p>
-          <p className="text-slate-400">Click any row to see the project-by-project breakdown.</p>
+          <div className="font-semibold text-slate-800">Role Utilization Formulas</div>
+          <p className="font-mono text-[10px] bg-slate-100 rounded px-2 py-1">Util% = Total_Demand / Supply</p>
+          <p className="font-mono text-[10px] bg-slate-100 rounded px-2 py-1 mt-1">Demand = Remaining_Hrs × Role% / Duration_Wks</p>
+          <p className="font-mono text-[10px] bg-slate-100 rounded px-2 py-1 mt-1">Remaining = Est_Hrs × (1 - Pct_Complete)</p>
+          <p className="font-mono text-[10px] bg-slate-100 rounded px-2 py-1 mt-1">Supply = SUM(Weekly_Hrs × (1 - Support%))</p>
+          <p className="mt-2"><strong>Assigned</strong> = demand from projects with a person assigned for this role.</p>
+          <p><strong>Unassigned</strong> = demand from projects needing this role but nobody assigned yet.</p>
+          <p className="text-slate-400 mt-1">Click any row for project breakdown. See Settings → Formulas for full detail.</p>
         </InfoTooltip>
       </h2>
       <table className="w-full">

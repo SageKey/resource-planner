@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SlidersHorizontal, BookOpen } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import {
@@ -70,17 +71,48 @@ export function Settings() {
     });
   };
 
+  const [tab, setTab] = useState<"sdlc" | "formulas">("sdlc");
+
   return (
     <>
-      <TopBar title="Settings" subtitle="Configure SDLC model and import data." />
+      <TopBar title="Settings" subtitle="Configure SDLC model and review calculation formulas." />
+
+      {/* Tabs */}
+      <div className="border-b border-slate-200 bg-white px-8">
+        <nav className="flex gap-1">
+          {[
+            { key: "sdlc" as const, label: "SDLC Model", icon: SlidersHorizontal },
+            { key: "formulas" as const, label: "Formulas & Math", icon: BookOpen },
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={cn(
+                "flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+                tab === key
+                  ? "border-indigo-600 text-indigo-700"
+                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
       <div className="p-8 space-y-8">
-        {isLoading && (
+        {/* Formulas tab */}
+        {tab === "formulas" && <FormulasReference />}
+
+        {/* SDLC tab */}
+        {tab === "sdlc" && isLoading && (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">
             Loading SDLC model...
           </div>
         )}
 
-        {sdlc && (
+        {tab === "sdlc" && sdlc && (
           <>
             {/* Phase Weights */}
             <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -226,5 +258,100 @@ export function Settings() {
         )}
       </div>
     </>
+  );
+}
+
+function FormulasReference() {
+  return (
+    <div className="space-y-6">
+      <FormulaCard
+        title="1. Supply (per role)"
+        formula="Supply = SUM( Weekly_Hrs × (1 - Support_Reserve%) ) for all team members in role"
+        explanation="Each person's available project hours = their weekly hours minus the portion reserved for support/break-fix. Supply for a role = total across all people in that role who are included in capacity."
+        example={`Example: 3 Developers\n  Alex:      35h × (1 - 0%) = 35.0 hrs/wk\n  Colin:     30h × (1 - 25%) = 22.5 hrs/wk\n  Nick:      25h × (1 - 40%) = 15.0 hrs/wk\n  Developer Supply = 72.5 hrs/wk`}
+      />
+
+      <FormulaCard
+        title="2. Demand (per role, per project)"
+        formula="Weekly_Demand = Remaining_Hrs × Role_Alloc% / Duration_Weeks"
+        explanation="For each active project, compute remaining hours (adjusted for % complete), multiply by the role's allocation percentage, divide by the project's full duration in weeks. This gives the average weekly demand that project places on that role."
+        example={`Example: ETE-83 (Customer Master Data Cleanup)\n  Est Hours: 640, % Complete: 15%\n  Remaining: 640 × (1 - 0.15) = 544 hrs\n  Developer Alloc: 50%\n  Duration: 33 weeks (Oct 14 → Jun 1)\n  Weekly Demand = 544 × 0.50 / 33 = 8.2 hrs/wk`}
+      />
+
+      <FormulaCard
+        title="3. Remaining Hours"
+        formula="Remaining = Est_Hours × (1 - Pct_Complete)"
+        explanation="A project that is 80% complete only generates 20% of its original demand. This prevents completed work from inflating the capacity picture."
+        example={`Example: 640 hrs at 80% complete\n  Remaining = 640 × (1 - 0.80) = 128 hrs\n  Only 128 hrs of demand remain across all roles`}
+      />
+
+      <FormulaCard
+        title="4. Utilization"
+        formula="Utilization% = Total_Role_Demand / Total_Role_Supply"
+        explanation="Sum weekly demand across ALL active projects for a role, divide by that role's total supply. This is the average weekly utilization."
+        example={`Example: Developer\n  Total Demand: 103 hrs/wk (sum across all projects)\n  Total Supply: 69 hrs/wk (sum across all developers)\n  Utilization = 103 / 69 = 149%\n\n  < 80% = Green (healthy)\n  80-99% = Yellow (stretched)\n  ≥ 100% = Red (over capacity)`}
+      />
+
+      <FormulaCard
+        title="5. Heatmap (week-by-week demand)"
+        formula="Cell = Weekly_Phase_Demand / Role_Supply"
+        explanation={`The heatmap distributes each project's demand across weeks using the SDLC phase model.\n\nFor each SDLC phase, the role's demand in that phase = Role_Total_Hrs × Phase_Effort% / Phase_Duration_Weeks.\n\nPhase durations come from Phase Weights on the Settings page (e.g., Build = 40% of the timeline). Role effort per phase comes from the Role-Phase Effort Matrix (e.g., Developer does 50% of their work during Build).\n\nThis creates the wave pattern: BAs are busiest in Discovery, Developers peak during Build.`}
+        example={`Example: PM on a 100-hour, 10-week project\n  PM Alloc: 10% → 10 PM hours total\n  Planning phase: 25% of PM work = 2.5 hrs\n  Planning duration: 10% of timeline = 1 week\n  PM demand during Planning week = 2.5 / 1 = 2.5 hrs/wk\n\n  Build phase: 20% of PM work = 2.0 hrs\n  Build duration: 40% of timeline = 4 weeks\n  PM demand during Build weeks = 2.0 / 4 = 0.5 hrs/wk`}
+      />
+
+      <FormulaCard
+        title="6. Person Demand"
+        formula="Person_Weekly_Demand = Project_Role_Demand × Person_Allocation%"
+        explanation="Person-level demand only counts projects they're explicitly assigned to via the Assignments tab. No even-split — if a person isn't assigned, they show zero demand from that project. This means person-level views are only as complete as your assignments."
+        example={`Example: Audrey assigned to ETE-7 at 100%\n  ETE-7 BA demand = 9.1 hrs/wk\n  Audrey's demand from ETE-7 = 9.1 × 1.0 = 9.1 hrs/wk\n\n  If she were assigned at 50%:\n  Audrey's demand = 9.1 × 0.5 = 4.55 hrs/wk`}
+      />
+
+      <FormulaCard
+        title="7. Person Availability"
+        formula="Available_Date = first date where Person_Utilization < 50%"
+        explanation="The engine walks forward in time. As each assigned project reaches its end date, that project's demand is removed from the person's load. The first date where their utilization drops below 50% = their available date. 'Available Now' means they're currently under 50%."
+        example={`Example: Colin at 90% utilization\n  ETE-68 ends May 15 → removes 15 hrs/wk demand\n  New utilization: 35%  → below 50% threshold\n  Available date: May 15`}
+      />
+
+      <FormulaCard
+        title="8. Auto-Scheduler"
+        formula="Earliest_Start = first week where ALL roles stay under 85% utilization"
+        explanation={`The scheduler processes plannable projects in priority order (Highest first). For each project, it scans forward week by week, simulating adding that project's phase-by-phase demand onto existing load.\n\nThe first week where no role exceeds 85% = the suggested start. Each placed project's demand is stamped into the grid before the next project is considered, so earlier projects get first pick.\n\nBottleneck role = the role preventing an earlier start (it hits 85% first).`}
+        example={`Example: New 200-hour project, Highest priority\n  Needs: Developer 50%, BA 10%\n  Week 0: Developer already at 90% → can't start\n  Week 3: Developer drops to 70% → fits at 85%\n  Suggested start: Week 3 (May 4)`}
+      />
+
+      <FormulaCard
+        title="9. SDLC Model"
+        formula="Phase_Weights × Role_Phase_Efforts → demand distribution"
+        explanation={`Two configurable tables drive the phase-aware calculations:\n\nPhase Weights: What percentage of the project timeline each phase occupies. Build at 40% means 40% of the project duration is the Build phase.\n\nRole-Phase Effort Matrix: What percentage of a role's total work happens in each phase. Developer at 50% Build means half of all developer hours are spent during Build.\n\nChanging these values on the Settings page immediately recalculates all heatmaps and capacity numbers.`}
+        example={`Default Phase Weights:\n  Discovery 10% | Planning 10% | Design 10%\n  Build 40% | Test 20% | Deploy 10%\n\nBA Effort Distribution:\n  Discovery 30% | Planning 20% | Design 20%\n  Build 10% | Test 15% | Deploy 5%\n  (BA is front-loaded, heavy in discovery/planning)`}
+      />
+    </div>
+  );
+}
+
+function FormulaCard({
+  title,
+  formula,
+  explanation,
+  example,
+}: {
+  title: string;
+  formula: string;
+  explanation: string;
+  example: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <h3 className="text-sm font-semibold text-slate-800 mb-3">{title}</h3>
+      <div className="rounded-md bg-slate-900 px-4 py-2.5 mb-3">
+        <code className="text-sm text-emerald-400 font-mono">{formula}</code>
+      </div>
+      <p className="text-sm text-slate-600 leading-relaxed mb-3 whitespace-pre-line">{explanation}</p>
+      <div className="rounded-md bg-slate-50 border border-slate-100 px-4 py-3">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Worked Example</div>
+        <pre className="text-xs text-slate-600 font-mono whitespace-pre-wrap">{example}</pre>
+      </div>
+    </div>
   );
 }
