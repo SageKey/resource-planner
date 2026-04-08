@@ -139,6 +139,7 @@ class Project:
     role_allocations: dict = field(default_factory=dict)
     notes: Optional[str] = None
     sort_order: Optional[int] = None
+    current_phase: Optional[str] = None  # discovery, planning, design, build, test, deploy
 
     @property
     def is_active(self) -> bool:

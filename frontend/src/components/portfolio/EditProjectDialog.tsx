@@ -27,6 +27,16 @@ const HEALTH_OPTIONS = [
 
 const PRIORITY_OPTIONS = ["Highest", "High", "Medium", "Low"];
 
+const PHASE_OPTIONS = [
+  { value: "", label: "— not set —" },
+  { value: "discovery", label: "Discovery" },
+  { value: "planning", label: "Planning" },
+  { value: "design", label: "Design" },
+  { value: "build", label: "Build" },
+  { value: "test", label: "Test" },
+  { value: "deploy", label: "Deploy" },
+];
+
 const ROLE_KEYS = [
   { key: "pm", label: "PM" },
   { key: "ba", label: "BA" },
@@ -53,6 +63,7 @@ type FormState = {
   est_hours: string;
   start_date: string;
   end_date: string;
+  current_phase: string;
   role_allocations: Record<string, string>;
 };
 
@@ -66,6 +77,7 @@ function blank(): FormState {
     est_hours: "0",
     start_date: "",
     end_date: "",
+    current_phase: "",
     role_allocations: Object.fromEntries(ROLE_KEYS.map((r) => [r.key, "0"])),
   };
 }
@@ -91,6 +103,7 @@ function fromProject(p: Project): FormState {
     est_hours: (p.est_hours || 0).toString(),
     start_date: p.start_date ?? "",
     end_date: p.end_date ?? "",
+    current_phase: (p as any).current_phase ?? "",
     role_allocations: Object.fromEntries(
       ROLE_KEYS.map((r) => [
         r.key,
@@ -147,6 +160,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
       start_date: form.start_date || null,
       end_date: form.end_date || null,
       est_hours: parseFloat(form.est_hours) || 0,
+      current_phase: form.current_phase || null,
       role_allocations: roleAllocations,
     };
 
@@ -217,8 +231,8 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
             </Field>
           </div>
 
-          {/* Hours, % Complete */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Hours, % Complete, Current Phase */}
+          <div className="grid grid-cols-3 gap-3">
             <Field label="Est. Hours">
               <input
                 type="number"
@@ -239,6 +253,13 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
                 onChange={(e) => set("pct_complete", e.target.value)}
                 className={inputCls}
               />
+            </Field>
+            <Field label="Current Phase">
+              <select value={form.current_phase} onChange={(e) => set("current_phase", e.target.value)} className={inputCls}>
+                {PHASE_OPTIONS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
             </Field>
           </div>
 

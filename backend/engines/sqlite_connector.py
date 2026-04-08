@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS projects (
     tshirt_size     TEXT,
     est_hours       REAL DEFAULT 0.0,
     notes           TEXT,
+    current_phase   TEXT,
     sort_order      INTEGER,
     created_at      TEXT DEFAULT (datetime('now')),
     updated_at      TEXT DEFAULT (datetime('now'))
@@ -219,6 +220,11 @@ class SQLiteConnector:
             "INSERT OR IGNORE INTO schema_info (key, value) VALUES (?, ?)",
             ("version", str(SCHEMA_VERSION)),
         )
+        # Migration: add current_phase column if missing
+        try:
+            self._conn.execute("ALTER TABLE projects ADD COLUMN current_phase TEXT")
+        except Exception:
+            pass  # already exists
         self._seed_default_settings()
         self._seed_sdlc_defaults()
         self._conn.commit()
@@ -358,6 +364,7 @@ class SQLiteConnector:
                 role_allocations=role_allocs,
                 notes=row["notes"],
                 sort_order=row["sort_order"],
+                current_phase=row["current_phase"] if "current_phase" in row.keys() else None,
             ))
 
         return projects

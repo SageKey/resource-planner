@@ -33,6 +33,7 @@ class ProjectOut(BaseModel):
     role_allocations: Dict[str, float] = {}
     notes: Optional[str] = None
     sort_order: Optional[int] = None
+    current_phase: Optional[str] = None
     is_active: bool = True
     duration_weeks: Optional[float] = None
 
@@ -61,6 +62,7 @@ class ProjectOut(BaseModel):
             role_allocations=p.role_allocations or {},
             notes=p.notes,
             sort_order=p.sort_order,
+            current_phase=getattr(p, "current_phase", None),
             is_active=p.is_active,
             duration_weeks=p.duration_weeks,
         )
@@ -86,6 +88,7 @@ class ProjectCreate(BaseModel):
     tshirt_size: Optional[str] = None
     est_hours: float = 0.0
     notes: Optional[str] = None
+    current_phase: Optional[str] = None
     role_allocations: Optional[Dict[str, float]] = None
 
 
@@ -111,6 +114,7 @@ class ProjectUpdate(BaseModel):
     tshirt_size: Optional[str] = None
     est_hours: Optional[float] = None
     notes: Optional[str] = None
+    current_phase: Optional[str] = None
     role_allocations: Optional[Dict[str, float]] = None
 
 
