@@ -33,25 +33,58 @@ log = logging.getLogger("planner.startup")
 
 
 def _seed_database_if_missing() -> None:
-    """Seed the DB with SDLC defaults if it's empty."""
+    """Seed the DB from seed_data.sql if it has no projects.
+
+    Safe to call on every boot — no-op once data exists. This ensures
+    the free-tier Railway deploy (no persistent volume) always comes up
+    with the portfolio and roster pre-loaded.
+    """
     import sqlite3
 
     db_path = Path(settings.db_path)
-    if db_path.exists():
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    need_seed = False
+    if not db_path.exists():
+        need_seed = True
+    else:
         try:
             conn = sqlite3.connect(str(db_path))
             row = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='projects'"
             ).fetchone()
+            if row is None:
+                need_seed = True
+            else:
+                count = conn.execute("SELECT COUNT(*) FROM projects").fetchone()
+                if count[0] == 0:
+                    need_seed = True
             conn.close()
-            if row is not None:
-                return  # DB already has tables
         except Exception:
-            pass
+            need_seed = True
 
-    # The SQLiteConnector._ensure_schema() handles table creation + SDLC defaults
-    # automatically on first connect. Nothing else to do here.
-    log.info("Database will be initialized on first request at %s", db_path)
+    if not need_seed:
+        log.info("Database has data, skipping seed")
+        return
+
+    # Look for seed_data.sql in the app directory
+    seed_file = Path(__file__).resolve().parent.parent / "seed_data.sql"
+    if not seed_file.exists():
+        log.warning("seed_data.sql not found at %s — skipping seed", seed_file)
+        return
+
+    log.info("Seeding database from %s", seed_file)
+    if db_path.exists():
+        db_path.unlink()
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.executescript(seed_file.read_text())
+        conn.commit()
+        log.info("Seed complete")
+    except Exception as exc:
+        log.error("Seed failed: %s", exc)
+    finally:
+        conn.close()
 
 
 def create_app() -> FastAPI:
