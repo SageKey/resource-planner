@@ -17,6 +17,39 @@ export function useHeatmap(weeks = 26) {
   });
 }
 
+export interface HeatmapDetailProject {
+  project_id: string;
+  project_name: string;
+  phase: string;
+  demand_hrs: number;
+  est_hours: number;
+  pct_complete: number;
+  role_alloc: number;
+}
+
+export interface HeatmapDetail {
+  role_key: string;
+  week_idx: number;
+  week_label: string;
+  supply_hrs: number;
+  total_demand_hrs: number;
+  utilization_pct: number;
+  projects: HeatmapDetailProject[];
+}
+
+export function useHeatmapDetail(roleKey: string | null, weekIdx: number | null) {
+  return useQuery<HeatmapDetail>({
+    queryKey: ["capacity", "heatmap-detail", roleKey, weekIdx],
+    queryFn: () =>
+      api
+        .get("/capacity/heatmap-detail", {
+          params: { role_key: roleKey, week_idx: weekIdx },
+        })
+        .then((r) => r.data),
+    enabled: roleKey !== null && weekIdx !== null,
+  });
+}
+
 export interface RoleCoverage {
   supply_hrs_week: number;
   assigned_hrs_week: number;

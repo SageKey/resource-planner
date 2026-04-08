@@ -76,6 +76,61 @@ def heatmap(
     return HeatmapResponse(weeks=week_labels, rows=rows)
 
 
+@router.get("/heatmap-detail")
+def heatmap_detail(
+    role_key: str = Query(...),
+    week_idx: int = Query(..., ge=0),
+    engine: CapacityEngine = Depends(get_capacity),
+):
+    """Return project-by-project breakdown for a specific role + week cell."""
+    active = engine.active_projects
+    supply = engine.compute_supply_by_role()
+
+    today = date.today()
+    days_to_monday = (7 - today.weekday()) % 7
+    scan_start = today + timedelta(days=days_to_monday if days_to_monday else 0)
+    week_start = scan_start + timedelta(weeks=week_idx)
+    week_label = week_start.strftime("%b %d")
+
+    projects = []
+    total_demand = 0.0
+
+    for project in active:
+        timeline = engine.compute_weekly_demand_timeline(project)
+        snapshots = timeline.get(role_key, [])
+        for snap in snapshots:
+            delta_days = (snap.week_start - scan_start).days
+            if delta_days < 0:
+                continue
+            idx = delta_days // 7
+            if idx == week_idx and snap.role_demand_hrs > 0.01:
+                projects.append({
+                    "project_id": project.id,
+                    "project_name": project.name,
+                    "phase": snap.phase_name,
+                    "demand_hrs": round(snap.role_demand_hrs, 2),
+                    "est_hours": project.est_hours,
+                    "pct_complete": project.pct_complete,
+                    "role_alloc": project.role_allocations.get(role_key, 0),
+                })
+                total_demand += snap.role_demand_hrs
+
+    role_supply = supply.get(role_key, 0.0)
+    util = total_demand / role_supply if role_supply > 0 else 0.0
+
+    projects.sort(key=lambda p: -p["demand_hrs"])
+
+    return {
+        "role_key": role_key,
+        "week_idx": week_idx,
+        "week_label": week_label,
+        "supply_hrs": round(role_supply, 1),
+        "total_demand_hrs": round(total_demand, 1),
+        "utilization_pct": round(util, 4),
+        "projects": projects,
+    }
+
+
 @router.get("/assignment-coverage")
 def assignment_coverage(
     engine: CapacityEngine = Depends(get_capacity),
