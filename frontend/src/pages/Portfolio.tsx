@@ -221,6 +221,7 @@ export function Portfolio() {
                     <tr className="border-b border-slate-100 text-left text-xs font-medium text-slate-500">
                       <th className="px-4 py-2">ID</th>
                       <th className="px-4 py-2">Name</th>
+                      <th className="px-4 py-2">Team</th>
                       <th className="px-4 py-2">Health</th>
                       <th className="px-4 py-2">Phase</th>
                       <th className="px-4 py-2">Priority</th>
@@ -258,6 +259,9 @@ export function Portfolio() {
                               ) : null;
                             })}
                           </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-500">
+                          {(p as any).team || "\u2014"}
                         </td>
                         <td className="px-4 py-2.5">
                           <span
