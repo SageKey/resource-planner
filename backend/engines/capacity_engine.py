@@ -447,8 +447,12 @@ class CapacityEngine:
             Remaining_Hrs = Est.Hours × (1 - pct_complete)
             Remaining_Weeks = max(end_date - today, end_date - start_date) / 7
 
-        Average weekly demand:
-            Remaining_Hrs × Role% / Remaining_Weeks
+        If current_phase is set, demand is scaled by phase effort:
+            phase_scale = phase_effort / avg_effort
+            weekly = flat_weekly × phase_scale
+
+        This means developers show ~18% of flat demand during Planning
+        (they do 5% of work there vs 27.5% average), but 182% during Build.
 
         CRITICAL: Demand is ZERO if Role% == 0 (the allocation gate).
         """
@@ -457,8 +461,6 @@ class CapacityEngine:
         if not project.start_date or not project.end_date or project.est_hours <= 0:
             return demands
 
-        # Use remaining duration (today to end) for projects already started,
-        # or full duration for projects that haven't started yet.
         today = date.today()
         if project.start_date <= today:
             remaining_days = max((project.end_date - today).days, 1)
@@ -469,31 +471,46 @@ class CapacityEngine:
         if duration <= 0:
             return demands
 
-        # Only count remaining work
         remaining_hours = project.est_hours * (1.0 - min(project.pct_complete, 1.0))
         if remaining_hours <= 0:
             return demands
 
         role_phase_efforts = self.assumptions.role_phase_efforts
+        role_avg_efforts = self.assumptions.role_avg_efforts
+        proj_current_phase = getattr(project, "current_phase", None)
 
         for role_key, alloc_pct in project.role_allocations.items():
-            # THE GATE: skip roles with zero allocation
             if alloc_pct <= 0:
                 continue
 
             if role_key not in role_phase_efforts:
                 continue
 
-            # Total role hours and average weekly demand
             role_total_hrs = remaining_hours * alloc_pct
-            avg_weekly = role_total_hrs / duration
+            flat_weekly = role_total_hrs / duration
 
-            # Phase-specific weekly demand — redistributes the same
-            # total hours across SDLC phases for the timeline view
+            # If current_phase is set, scale by how intense this role is
+            # in the current phase relative to its average across all phases
+            if proj_current_phase and proj_current_phase in SDLC_PHASES:
+                phase_effort = role_phase_efforts[role_key].get(proj_current_phase, 0.0)
+                avg_effort = role_avg_efforts.get(role_key, 0.0)
+                if avg_effort > 0:
+                    phase_scale = phase_effort / avg_effort
+                else:
+                    phase_scale = 1.0
+                avg_weekly = flat_weekly * phase_scale
+            else:
+                avg_weekly = flat_weekly
+
+            # Phase-specific weekly demand for detail views
             phase_weekly = {}
             for phase in SDLC_PHASES:
                 phase_effort = role_phase_efforts[role_key].get(phase, 0.0)
-                phase_weekly[phase] = role_total_hrs * phase_effort / duration
+                avg_eff = role_avg_efforts.get(role_key, 0.0)
+                if avg_eff > 0:
+                    phase_weekly[phase] = flat_weekly * (phase_effort / avg_eff)
+                else:
+                    phase_weekly[phase] = flat_weekly
 
             demands.append(RoleDemand(
                 project_id=project.id,
@@ -694,24 +711,12 @@ class CapacityEngine:
         if duration_days <= 0:
             return {}
 
-        # Only count remaining work
         remaining_hours = project.est_hours * (1.0 - min(project.pct_complete, 1.0))
         if remaining_hours <= 0:
             return {}
 
-        # Use flat distribution: spread remaining demand evenly across
-        # remaining weeks. The current_phase field is informational —
-        # it labels the project but doesn't change the math.
-        #
-        # Why flat instead of SDLC-phased: trying to predict which week
-        # is Build vs Planning creates artificial spikes (310% one week,
-        # 40% the next) that don't represent how work actually flows.
-        # Flat distribution matches the utilization bar average and gives
-        # a consistent, trustworthy picture.
-
         proj_current_phase = getattr(project, "current_phase", None) or "—"
 
-        # Timeline: from today (skip past) to end date
         today = date.today()
         timeline_start = max(project.start_date, today)
         timeline_end = project.end_date
@@ -720,14 +725,28 @@ class CapacityEngine:
 
         remaining_weeks = max((timeline_end - timeline_start).days / 7.0, 0.5)
 
+        role_phase_efforts = self.assumptions.role_phase_efforts
+        role_avg_efforts = self.assumptions.role_avg_efforts
+
         role_timelines = defaultdict(list)
 
         for role_key, alloc_pct in project.role_allocations.items():
-            if alloc_pct <= 0:
+            if alloc_pct <= 0 or role_key not in role_phase_efforts:
                 continue
 
             role_total_hrs = remaining_hours * alloc_pct
-            weekly_demand = role_total_hrs / remaining_weeks
+            flat_weekly = role_total_hrs / remaining_weeks
+
+            # Scale by current phase effort if set
+            if proj_current_phase in SDLC_PHASES:
+                phase_effort = role_phase_efforts[role_key].get(proj_current_phase, 0.0)
+                avg_effort = role_avg_efforts.get(role_key, 0.0)
+                if avg_effort > 0:
+                    weekly_demand = flat_weekly * (phase_effort / avg_effort)
+                else:
+                    weekly_demand = flat_weekly
+            else:
+                weekly_demand = flat_weekly
 
             current = timeline_start
             while current < timeline_end:
