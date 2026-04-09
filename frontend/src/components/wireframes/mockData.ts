@@ -16,6 +16,12 @@ export type RoleKey =
   | "technical"
   | "developer"
   | "infrastructure";
+export type Priority = "Highest" | "High" | "Medium" | "Low";
+
+// Fake "today" baked in so the wireframe looks the same regardless of
+// when someone views it. Aligns with the project date spread below so
+// TODAY lands mid-range.
+export const MOCK_TODAY = new Date("2026-04-09T00:00:00");
 
 export interface MockRole {
   key: RoleKey;
@@ -41,7 +47,7 @@ export const ROLE_BY_KEY: Record<RoleKey, MockRole> = Object.fromEntries(
 export interface PhaseState {
   hoursByRole: Partial<Record<RoleKey, number>>;
   progress: number; // 0..1
-  startWeek: number | null; // index into the 12-week timeline (0..11), null if not yet scheduled
+  startWeek: number | null;
   endWeek: number | null;
 }
 
@@ -51,18 +57,23 @@ export interface MockProject {
   tshirt: "S" | "M" | "L" | "XL";
   totalHours: number;
   currentPhase: PhaseOrDone;
+  // Overall (portfolio-level) fields used by the Gantt view
+  priority: Priority;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  pctComplete: number; // 0..1 overall project progress
   // Stable Tailwind color classes so the same project looks the same everywhere
-  colorBar: string; // block/bar fill (e.g. "bg-sky-500")
-  colorBarText: string; // bar text
-  colorBadge: string; // subtle badge (e.g. "bg-sky-100 text-sky-700")
-  colorDot: string; // dot / legend swatch
+  colorBar: string;
+  colorBarText: string;
+  colorBadge: string;
+  colorDot: string;
+  // Phase-level details used by RoleCards + PhaseKanban
   planning: PhaseState;
   build: PhaseState;
   test_deploy: PhaseState;
 }
 
-// Each project has a stable color picked from this palette.
-// sky, emerald, violet, amber, rose, teal, indigo
+// Palette — each project gets a stable entry
 const PALETTE = {
   sky: {
     bar: "bg-sky-500",
@@ -110,120 +121,157 @@ const PALETTE = {
 
 type PaletteKey = keyof typeof PALETTE;
 
-function project(
-  id: string,
-  name: string,
-  paletteKey: PaletteKey,
-  tshirt: MockProject["tshirt"],
-  totalHours: number,
-  currentPhase: PhaseOrDone,
-  planning: PhaseState,
-  build: PhaseState,
-  test_deploy: PhaseState,
-): MockProject {
-  const p = PALETTE[paletteKey];
+interface ProjectInit {
+  id: string;
+  name: string;
+  paletteKey: PaletteKey;
+  tshirt: MockProject["tshirt"];
+  totalHours: number;
+  currentPhase: PhaseOrDone;
+  priority: Priority;
+  startDate: string;
+  endDate: string;
+  pctComplete: number;
+  planning: PhaseState;
+  build: PhaseState;
+  test_deploy: PhaseState;
+}
+
+function project(o: ProjectInit): MockProject {
+  const p = PALETTE[o.paletteKey];
   return {
-    id,
-    name,
-    tshirt,
-    totalHours,
-    currentPhase,
+    id: o.id,
+    name: o.name,
+    tshirt: o.tshirt,
+    totalHours: o.totalHours,
+    currentPhase: o.currentPhase,
+    priority: o.priority,
+    startDate: o.startDate,
+    endDate: o.endDate,
+    pctComplete: o.pctComplete,
     colorBar: p.bar,
     colorBarText: p.barText,
     colorBadge: p.badge,
     colorDot: p.dot,
-    planning,
-    build,
-    test_deploy,
+    planning: o.planning,
+    build: o.build,
+    test_deploy: o.test_deploy,
   };
 }
 
-// 7 projects — varied phase, varied size, a done one, a waiting one,
-// plus some small work that skipped Planning.
+// 7 projects — varied priority, size, phase, progress, and dates so
+// the Gantt has visual variety and the other views have enough state
+// to look populated.
 export const PROJECTS: MockProject[] = [
-  project(
-    "ETE-68",
-    "Catalog API Rust2Python",
-    "sky",
-    "L",
-    640,
-    "build",
-    { hoursByRole: { pm: 30, ba: 40, technical: 60 }, progress: 1, startWeek: 0, endWeek: 2 },
-    { hoursByRole: { pm: 40, developer: 320, technical: 40 }, progress: 0.55, startWeek: 2, endWeek: 8 },
-    { hoursByRole: { pm: 20, developer: 60, infrastructure: 30 }, progress: 0, startWeek: 8, endWeek: 10 },
-  ),
-  project(
-    "ETE-97",
-    "Standard Order Notifications",
-    "emerald",
-    "M",
-    200,
-    "planning",
-    { hoursByRole: { pm: 15, ba: 40, functional: 20 }, progress: 0.6, startWeek: 0, endWeek: 2 },
-    { hoursByRole: { pm: 10, developer: 90, technical: 15 }, progress: 0, startWeek: 2, endWeek: 6 },
-    { hoursByRole: { pm: 5, developer: 15, infrastructure: 5 }, progress: 0, startWeek: 6, endWeek: 7 },
-  ),
-  project(
-    "ETE-19",
-    "AR Aging Report Fix",
-    "amber",
-    "S",
-    80,
-    "build",
-    { hoursByRole: {}, progress: 1, startWeek: 0, endWeek: 0 }, // small: skipped planning
-    { hoursByRole: { developer: 55, technical: 10 }, progress: 0.35, startWeek: 0, endWeek: 3 },
-    { hoursByRole: { developer: 10, ba: 5 }, progress: 0, startWeek: 3, endWeek: 4 },
-  ),
-  project(
-    "ETE-43",
-    "Microsoft Purview Rollout",
-    "violet",
-    "XL",
-    1280,
-    "planning",
-    { hoursByRole: { pm: 60, ba: 80, functional: 40, infrastructure: 60 }, progress: 0.3, startWeek: 0, endWeek: 4 },
-    { hoursByRole: { pm: 40, developer: 280, technical: 120, infrastructure: 120 }, progress: 0, startWeek: 4, endWeek: 11 },
-    { hoursByRole: { pm: 30, developer: 60, infrastructure: 80, ba: 30 }, progress: 0, startWeek: 11, endWeek: 12 },
-  ),
-  project(
-    "ETE-37",
-    "Magic Search (BuyETE)",
-    "rose",
-    "S",
-    100,
-    "planning",
-    { hoursByRole: { pm: 8, ba: 20, functional: 10 }, progress: 0.2, startWeek: 1, endWeek: 3 },
-    { hoursByRole: { developer: 45, technical: 10 }, progress: 0, startWeek: 3, endWeek: 6 },
-    { hoursByRole: { developer: 5, pm: 2 }, progress: 0, startWeek: 6, endWeek: 7 },
-  ),
-  project(
-    "ETE-124",
-    "Clean Up Return Loads",
-    "teal",
-    "M",
-    200,
-    "test_deploy",
-    { hoursByRole: { pm: 20, ba: 30, functional: 20 }, progress: 1, startWeek: 0, endWeek: 2 },
-    { hoursByRole: { developer: 80, technical: 30 }, progress: 1, startWeek: 2, endWeek: 5 },
-    { hoursByRole: { developer: 15, ba: 10, pm: 10 }, progress: 0.45, startWeek: 5, endWeek: 7 },
-  ),
-  project(
-    "ETE-7",
-    "Outsourced Unit Core Accounting",
-    "indigo",
-    "XL",
-    1600,
-    "not_started",
-    { hoursByRole: { pm: 80, ba: 120, functional: 60 }, progress: 0, startWeek: 4, endWeek: 8 },
-    { hoursByRole: { pm: 40, developer: 500, technical: 200 }, progress: 0, startWeek: 8, endWeek: 11 },
-    { hoursByRole: { pm: 20, developer: 60, infrastructure: 40 }, progress: 0, startWeek: 11, endWeek: 12 },
-  ),
+  project({
+    id: "ETE-68",
+    name: "Catalog API Rust2Python",
+    paletteKey: "sky",
+    tshirt: "L",
+    totalHours: 640,
+    currentPhase: "build",
+    priority: "Highest",
+    startDate: "2025-11-15",
+    endDate: "2026-06-24",
+    pctComplete: 0.55,
+    planning: { hoursByRole: { pm: 30, ba: 40, technical: 60 }, progress: 1, startWeek: 0, endWeek: 2 },
+    build: { hoursByRole: { pm: 40, developer: 320, technical: 40 }, progress: 0.55, startWeek: 2, endWeek: 8 },
+    test_deploy: { hoursByRole: { pm: 20, developer: 60, infrastructure: 30 }, progress: 0, startWeek: 8, endWeek: 10 },
+  }),
+  project({
+    id: "ETE-43",
+    name: "Microsoft Purview Rollout",
+    paletteKey: "violet",
+    tshirt: "XL",
+    totalHours: 1280,
+    currentPhase: "planning",
+    priority: "Highest",
+    startDate: "2026-03-01",
+    endDate: "2026-09-15",
+    pctComplete: 0.3,
+    planning: { hoursByRole: { pm: 60, ba: 80, functional: 40, infrastructure: 60 }, progress: 0.3, startWeek: 0, endWeek: 4 },
+    build: { hoursByRole: { pm: 40, developer: 280, technical: 120, infrastructure: 120 }, progress: 0, startWeek: 4, endWeek: 11 },
+    test_deploy: { hoursByRole: { pm: 30, developer: 60, infrastructure: 80, ba: 30 }, progress: 0, startWeek: 11, endWeek: 12 },
+  }),
+  project({
+    id: "ETE-97",
+    name: "Standard Order Notifications",
+    paletteKey: "emerald",
+    tshirt: "M",
+    totalHours: 200,
+    currentPhase: "planning",
+    priority: "High",
+    startDate: "2026-02-01",
+    endDate: "2026-05-20",
+    pctComplete: 0.2,
+    planning: { hoursByRole: { pm: 15, ba: 40, functional: 20 }, progress: 0.6, startWeek: 0, endWeek: 2 },
+    build: { hoursByRole: { pm: 10, developer: 90, technical: 15 }, progress: 0, startWeek: 2, endWeek: 6 },
+    test_deploy: { hoursByRole: { pm: 5, developer: 15, infrastructure: 5 }, progress: 0, startWeek: 6, endWeek: 7 },
+  }),
+  project({
+    id: "ETE-7",
+    name: "Outsourced Unit Core Accounting",
+    paletteKey: "indigo",
+    tshirt: "XL",
+    totalHours: 1600,
+    currentPhase: "not_started",
+    priority: "High",
+    startDate: "2026-06-01",
+    endDate: "2026-12-15",
+    pctComplete: 0,
+    planning: { hoursByRole: { pm: 80, ba: 120, functional: 60 }, progress: 0, startWeek: 4, endWeek: 8 },
+    build: { hoursByRole: { pm: 40, developer: 500, technical: 200 }, progress: 0, startWeek: 8, endWeek: 11 },
+    test_deploy: { hoursByRole: { pm: 20, developer: 60, infrastructure: 40 }, progress: 0, startWeek: 11, endWeek: 12 },
+  }),
+  project({
+    id: "ETE-37",
+    name: "Magic Search (BuyETE)",
+    paletteKey: "rose",
+    tshirt: "S",
+    totalHours: 100,
+    currentPhase: "planning",
+    priority: "High",
+    startDate: "2026-04-15",
+    endDate: "2026-06-30",
+    pctComplete: 0.05,
+    planning: { hoursByRole: { pm: 8, ba: 20, functional: 10 }, progress: 0.2, startWeek: 1, endWeek: 3 },
+    build: { hoursByRole: { developer: 45, technical: 10 }, progress: 0, startWeek: 3, endWeek: 6 },
+    test_deploy: { hoursByRole: { developer: 5, pm: 2 }, progress: 0, startWeek: 6, endWeek: 7 },
+  }),
+  project({
+    id: "ETE-124",
+    name: "Clean Up Return Loads",
+    paletteKey: "teal",
+    tshirt: "M",
+    totalHours: 200,
+    currentPhase: "test_deploy",
+    priority: "Medium",
+    startDate: "2025-12-01",
+    endDate: "2026-05-10",
+    pctComplete: 0.75,
+    planning: { hoursByRole: { pm: 20, ba: 30, functional: 20 }, progress: 1, startWeek: 0, endWeek: 2 },
+    build: { hoursByRole: { developer: 80, technical: 30 }, progress: 1, startWeek: 2, endWeek: 5 },
+    test_deploy: { hoursByRole: { developer: 15, ba: 10, pm: 10 }, progress: 0.45, startWeek: 5, endWeek: 7 },
+  }),
+  project({
+    id: "ETE-19",
+    name: "AR Aging Report Fix",
+    paletteKey: "amber",
+    tshirt: "S",
+    totalHours: 80,
+    currentPhase: "build",
+    priority: "Medium",
+    startDate: "2026-03-10",
+    endDate: "2026-04-24",
+    pctComplete: 0.35,
+    planning: { hoursByRole: {}, progress: 1, startWeek: 0, endWeek: 0 }, // small: skipped planning
+    build: { hoursByRole: { developer: 55, technical: 10 }, progress: 0.35, startWeek: 0, endWeek: 3 },
+    test_deploy: { hoursByRole: { developer: 10, ba: 5 }, progress: 0, startWeek: 3, endWeek: 4 },
+  }),
 ];
 
-export const TIMELINE_WEEKS = 12;
-
 // -------------------------------------------------------------------------
-// Derived helpers — pure, computed once at module load
+// Derived helpers — pure, computed on call
 // -------------------------------------------------------------------------
 
 export function phaseLabel(p: PhaseOrDone): string {
@@ -256,11 +304,10 @@ export function phaseBadge(p: PhaseOrDone): string {
   }
 }
 
-// "Currently working on" for a role: projects whose current phase uses this role.
 export interface CurrentWorkItem {
   project: MockProject;
   phase: PhaseKey;
-  hoursRemaining: number; // rough: phase hours for role × (1 - progress)
+  hoursRemaining: number;
   hoursTotal: number;
 }
 
@@ -282,8 +329,6 @@ export function currentWorkForRole(roleKey: RoleKey): CurrentWorkItem[] {
   return items.sort((a, b) => b.hoursRemaining - a.hoursRemaining);
 }
 
-// "Up next" for a role: projects that aren't currently using this role
-// but will in a later phase. Returns at most 3.
 export interface UpNextItem {
   project: MockProject;
   phase: PhaseKey;
@@ -299,9 +344,7 @@ export function upcomingWorkForRole(roleKey: RoleKey): UpNextItem[] {
       const state = p[ph];
       const hrs = state.hoursByRole[roleKey] ?? 0;
       if (hrs <= 0) continue;
-      // Skip the phase already in progress for this role
       if (p.currentPhase === ph) continue;
-      // Skip phases already done (before current phase)
       if (p.currentPhase !== "not_started") {
         const order = ["planning", "build", "test_deploy"];
         const currentIdx = order.indexOf(p.currentPhase as string);
@@ -314,18 +357,16 @@ export function upcomingWorkForRole(roleKey: RoleKey): UpNextItem[] {
         hours: hrs,
         estStartWeek: state.startWeek ?? 99,
       });
-      break; // only the first upcoming phase per project
+      break;
     }
   }
   return items.sort((a, b) => a.estStartWeek - b.estStartWeek).slice(0, 3);
 }
 
-// Demand this week for a role — sum of "currently working on" hours divided
-// roughly over their remaining weeks. Used for the "free this week" metric.
 export function roleWeeklyLoad(roleKey: RoleKey): {
   consumedHrs: number;
   freeHrs: number;
-  pctUsed: number; // 0..1
+  pctUsed: number;
 } {
   const role = ROLE_BY_KEY[roleKey];
   let consumed = 0;
@@ -348,59 +389,10 @@ export function roleWeeklyLoad(roleKey: RoleKey): {
   };
 }
 
-// For the kanban view: group projects by current phase
 export function projectsInPhase(phase: PhaseKey): MockProject[] {
   return PROJECTS.filter((p) => p.currentPhase === phase);
 }
 
 export function projectsWaitingToStart(): MockProject[] {
   return PROJECTS.filter((p) => p.currentPhase === "not_started");
-}
-
-// For the timeline view: returns all "blocks" for a role.
-// A block is a phase-of-a-project that consumes this role for a week range.
-export interface TimelineBlock {
-  project: MockProject;
-  phase: PhaseKey;
-  startWeek: number;
-  endWeek: number;
-  hours: number;
-}
-
-export function timelineBlocksForRole(roleKey: RoleKey): TimelineBlock[] {
-  const blocks: TimelineBlock[] = [];
-  for (const p of PROJECTS) {
-    const phases: PhaseKey[] = ["planning", "build", "test_deploy"];
-    for (const ph of phases) {
-      const state = p[ph];
-      const hrs = state.hoursByRole[roleKey] ?? 0;
-      if (hrs <= 0) continue;
-      if (state.startWeek === null || state.endWeek === null) continue;
-      blocks.push({
-        project: p,
-        phase: ph,
-        startWeek: state.startWeek,
-        endWeek: state.endWeek,
-        hours: hrs,
-      });
-    }
-  }
-  return blocks;
-}
-
-// For the timeline week header — generate 12 labels starting from next Monday
-export function weekLabels(): string[] {
-  const out: string[] = [];
-  const now = new Date();
-  const daysToMonday = (8 - now.getDay()) % 7;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + (daysToMonday || 7));
-  for (let i = 0; i < TIMELINE_WEEKS; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i * 7);
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    out.push(`${mm}/${dd}`);
-  }
-  return out;
 }

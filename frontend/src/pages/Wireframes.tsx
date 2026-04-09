@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { AlertTriangle, LayoutGrid, CalendarRange, Columns3 } from "lucide-react";
+import { AlertTriangle, LayoutGrid, GanttChartSquare, Columns3 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { RoleCardsConcept } from "@/components/wireframes/RoleCardsConcept";
-import { RoleTimelineConcept } from "@/components/wireframes/RoleTimelineConcept";
+import { ProjectGanttConcept } from "@/components/wireframes/ProjectGanttConcept";
 import { PhaseKanbanConcept } from "@/components/wireframes/PhaseKanbanConcept";
 import { cn } from "@/lib/cn";
 
-type TabKey = "cards" | "timeline" | "kanban";
+type TabKey = "cards" | "gantt" | "kanban";
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; description: string }[] = [
   {
@@ -16,10 +16,10 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
     description: "Per-role state: who's busy, how much is free, what's queued.",
   },
   {
-    key: "timeline",
-    label: "Role Timeline",
-    icon: CalendarRange,
-    description: "Gantt-style — 12 weeks across, roles down, project blocks in between.",
+    key: "gantt",
+    label: "Project Gantt",
+    icon: GanttChartSquare,
+    description: "Classic Gantt — one row per project, colored by priority, with progress fill and today marker.",
   },
   {
     key: "kanban",
@@ -80,7 +80,7 @@ export function Wireframes() {
         {/* Active concept */}
         <div>
           {tab === "cards" && <RoleCardsConcept />}
-          {tab === "timeline" && <RoleTimelineConcept />}
+          {tab === "gantt" && <ProjectGanttConcept />}
           {tab === "kanban" && <PhaseKanbanConcept />}
         </div>
 
