@@ -1153,53 +1153,26 @@ class CapacityEngine:
     ) -> dict:
         """Build a week×role demand grid from a list of projects.
 
+        Uses compute_weekly_demand_timeline for each project so the grid
+        reflects phase-scaled demand (consistent with utilization bars
+        and the heatmap).
+
         Returns: {week_index: {role_key: demand_hrs}}
         """
-        phase_weights = self.assumptions.sdlc_phase_weights
-        role_phase_efforts = self.assumptions.role_phase_efforts
         grid = defaultdict(lambda: defaultdict(float))
 
         for project in projects:
-            if not project.start_date or not project.end_date:
-                continue
-            if project.est_hours <= 0:
-                continue
-
-            proj_duration_days = (project.end_date - project.start_date).days
-            if proj_duration_days <= 0:
-                continue
-
-            # Phase boundaries
-            phase_bounds = []
-            cumulative = 0
-            for phase in SDLC_PHASES:
-                w = phase_weights.get(phase, 0.0)
-                pd_days = round(proj_duration_days * w)
-                phase_bounds.append((phase, cumulative, cumulative + pd_days))
-                cumulative += pd_days
-
-            for role_key, alloc_pct in project.role_allocations.items():
-                if alloc_pct <= 0 or role_key not in role_phase_efforts:
-                    continue
-                role_hrs = project.est_hours * alloc_pct
-
-                for week_idx in range(horizon_weeks):
-                    week_start = scan_start + timedelta(weeks=week_idx)
-                    week_end = week_start + timedelta(days=7)
-
-                    if week_end <= project.start_date or week_start >= project.end_date:
+            timeline = self.compute_weekly_demand_timeline(project)
+            for role_key, snapshots in timeline.items():
+                for snap in snapshots:
+                    delta_days = (snap.week_start - scan_start).days
+                    if delta_days < 0:
                         continue
+                    week_idx = delta_days // 7
+                    if week_idx < horizon_weeks:
+                        grid[week_idx][role_key] += snap.role_demand_hrs
 
-                    day_offset = max(0, (week_start - project.start_date).days)
-                    current_phase = SDLC_PHASES[-1]
-                    for pname, ps, pe in phase_bounds:
-                        if ps <= day_offset < pe:
-                            current_phase = pname
-                            break
-
-                    phase_effort = role_phase_efforts[role_key].get(current_phase, 0.0)
-                    proj_weeks = max(1, proj_duration_days / 7.0)
-                    weekly_demand = role_hrs * phase_effort / proj_weeks
+        return grid
                     grid[week_idx][role_key] += weekly_demand
 
         return grid
