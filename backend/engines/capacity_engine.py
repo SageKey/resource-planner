@@ -699,33 +699,45 @@ class CapacityEngine:
             remaining_phases = SDLC_PHASES
 
         # Build phase boundaries
-        # If current_phase is set, distribute remaining timeline across
-        # remaining phases proportionally from today forward
+        # If current_phase is set, use a simple model:
+        # - The current phase occupies its proportional share of remaining time
+        #   (minimum 14 days so it doesn't vanish)
+        # - Future phases fill the rest proportionally
+        # - Timeline starts from today
         if proj_current_phase and proj_current_phase in SDLC_PHASES:
             today = date.today()
-            remaining_days = max((project.end_date - today).days, 1)
+            remaining_days = max((project.end_date - today).days, 7)
 
-            # Normalize remaining phase weights to sum to 1.0
+            # Normalize remaining phase weights
             raw_weights = {p: phase_weights.get(p, 0.0) for p in remaining_phases}
             weight_sum = sum(raw_weights.values())
             if weight_sum <= 0:
                 weight_sum = 1.0
             norm_weights = {p: w / weight_sum for p, w in raw_weights.items()}
 
-            # Build boundaries from today (day 0 = today)
-            # The current phase gets a minimum of 7 days so it doesn't
-            # get squeezed below one week and disappear from the heatmap
-            phase_boundaries = []
-            cumulative = 0
-            min_current_phase_days = 7
-            for phase in remaining_phases:
-                phase_days = round(remaining_days * norm_weights[phase])
-                if phase == proj_current_phase:
-                    phase_days = max(phase_days, min_current_phase_days)
+            # Current phase gets minimum 14 days (2 weeks)
+            current_phase_days = max(
+                round(remaining_days * norm_weights.get(proj_current_phase, 0.1)),
+                14,
+            )
+
+            # Remaining days after current phase
+            future_phases = [p for p in remaining_phases if p != proj_current_phase]
+            days_for_future = max(remaining_days - current_phase_days, 0)
+
+            # Distribute future days proportionally
+            future_weight_sum = sum(norm_weights.get(p, 0) for p in future_phases)
+            phase_boundaries = [(proj_current_phase, 0, current_phase_days)]
+            cumulative = current_phase_days
+            for phase in future_phases:
+                if future_weight_sum > 0 and days_for_future > 0:
+                    share = norm_weights.get(phase, 0) / future_weight_sum
+                    phase_days = round(days_for_future * share)
+                else:
+                    phase_days = 0
                 phase_boundaries.append((phase, cumulative, cumulative + phase_days))
                 cumulative += phase_days
 
-            # Timeline starts from today, not project start
             timeline_start = today
             timeline_end = project.end_date
         else:
