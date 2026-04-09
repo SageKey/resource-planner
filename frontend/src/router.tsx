@@ -5,6 +5,7 @@ import { Portfolio } from "@/pages/Portfolio";
 import { TeamRoster } from "@/pages/TeamRoster";
 import { Planning } from "@/pages/Planning";
 import { Settings } from "@/pages/Settings";
+import { Wireframes } from "@/pages/Wireframes";
 
 export const router = createBrowserRouter([
   {
@@ -16,6 +17,8 @@ export const router = createBrowserRouter([
       { path: "roster", element: <TeamRoster /> },
       { path: "planning", element: <Planning /> },
       { path: "settings", element: <Settings /> },
+      // Hidden — not in Sidebar. Reachable only via direct URL.
+      { path: "wireframes", element: <Wireframes /> },
     ],
   },
 ]);
