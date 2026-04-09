@@ -443,23 +443,30 @@ class CapacityEngine:
         """
         Calculate weekly demand for each role on a project.
 
-        Uses REMAINING hours (adjusted for % complete):
-            Remaining = Est.Hours × (1 - pct_complete)
+        Uses REMAINING hours and REMAINING duration:
+            Remaining_Hrs = Est.Hours × (1 - pct_complete)
+            Remaining_Weeks = max(end_date - today, end_date - start_date) / 7
 
-        Average weekly demand (total role hours spread evenly):
-            Remaining × Role% / Duration_weeks
-
-        Phase-aware weekly demand (for the heatmap timeline):
-            Remaining × Role% × Role_Phase_Effort / Duration_weeks
-            These redistribute the SAME total hours across phases
-            (heavier in build, lighter in deploy, etc.)
+        Average weekly demand:
+            Remaining_Hrs × Role% / Remaining_Weeks
 
         CRITICAL: Demand is ZERO if Role% == 0 (the allocation gate).
         """
         demands = []
-        duration = project.duration_weeks
 
-        if not duration or duration <= 0 or project.est_hours <= 0:
+        if not project.start_date or not project.end_date or project.est_hours <= 0:
+            return demands
+
+        # Use remaining duration (today to end) for projects already started,
+        # or full duration for projects that haven't started yet.
+        today = date.today()
+        if project.start_date <= today:
+            remaining_days = max((project.end_date - today).days, 1)
+        else:
+            remaining_days = max((project.end_date - project.start_date).days, 1)
+        duration = remaining_days / 7.0
+
+        if duration <= 0:
             return demands
 
         # Only count remaining work
