@@ -10,6 +10,10 @@ export interface Project {
   start_date: string | null;
   end_date: string | null;
   actual_end: string | null;
+  functional_spec_due: string | null;
+  functional_spec_completed: string | null;
+  technical_spec_due: string | null;
+  technical_spec_completed: string | null;
   team: string | null;
   pm: string | null;
   ba: string | null;

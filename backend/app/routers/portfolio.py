@@ -84,6 +84,21 @@ def _normalize_project(fields: Dict[str, Any], current: object = None) -> None:
         fields["pct_complete"] = 1.0
         return
 
+    # Spec auto-transitions (PATCH only — skip on create when current is None).
+    # Only fires when health isn't being explicitly set in the same payload.
+    if current is not None and "health" not in fields:
+        func_done = fields.get("functional_spec_completed") not in (None, "")
+        tech_done = fields.get("technical_spec_completed") not in (None, "")
+        current_health_up = (getattr(current, "health", None) or "").upper()
+
+        if tech_done and "TECHNICAL SPEC" in current_health_up:
+            # Finished technical spec → project moves to On Track
+            fields["health"] = "\U0001f7e2 ON TRACK"
+        elif func_done and "FUNCTIONAL SPEC" in current_health_up:
+            # Finished functional spec → move to Needs Technical Spec
+            # (unless the same PATCH also completes tech, handled above)
+            fields["health"] = "\U0001f535 NEEDS TECHNICAL SPEC"
+
     pct = fields.get("pct_complete")
     current_health = getattr(current, "health", None)
 

@@ -27,6 +27,25 @@ export function formatDate(d: string | null | undefined): string {
   return `${mm}-${dd}-${yyyy}`;
 }
 
+/** Urgency bucket for a due date. Null/empty → null (nothing to show). */
+export function dueUrgency(
+  d: string | null | undefined,
+): "overdue" | "this_week" | "later" | null {
+  if (!d) return null;
+  const date = new Date(d + "T00:00:00");
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((date.getTime() - now.getTime()) / 86_400_000);
+  if (diffDays < 0) return "overdue";
+  if (diffDays <= 7) return "this_week";
+  return "later";
+}
+
+/** True if the date is in the past. Null/empty → false. */
+export function isOverdue(d: string | null | undefined): boolean {
+  return dueUrgency(d) === "overdue";
+}
+
 /** Relative date: "3 weeks ago", "in 2 weeks". */
 export function relativeDate(d: string | null | undefined): string {
   if (!d) return "—";

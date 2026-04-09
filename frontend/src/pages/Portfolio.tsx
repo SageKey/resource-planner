@@ -1,11 +1,39 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, FolderKanban, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, FolderKanban, Plus, Trash2 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { EditProjectDialog } from "@/components/portfolio/EditProjectDialog";
 import { usePortfolio, useDeleteProject } from "@/hooks/usePortfolio";
-import { formatDate } from "@/lib/format";
+import { formatDate, dueUrgency } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { Project } from "@/types/project";
+
+// ---------------------------------------------------------------------------
+// Spec helpers
+// ---------------------------------------------------------------------------
+
+/** Returns the "active" spec due date for a project in the needs_spec group —
+ *  the technical due date if the project is in Needs Technical Spec (functional
+ *  is done), otherwise the functional due date. */
+function activeSpecDue(p: Project): string | null {
+  const h = (p.health ?? "").toUpperCase();
+  if (h.includes("TECHNICAL SPEC")) return p.technical_spec_due;
+  return p.functional_spec_due;
+}
+
+/** Returns the "most recent" spec completion to show in the Needs Spec table
+ *  (only functional spec can be completed while still in the group). */
+function shownSpecCompleted(p: Project): string | null {
+  const h = (p.health ?? "").toUpperCase();
+  if (h.includes("TECHNICAL SPEC")) return p.functional_spec_completed;
+  return null;
+}
+
+function specDueCellClass(d: string | null | undefined): string {
+  const u = dueUrgency(d);
+  if (u === "overdue") return "bg-red-50 text-red-700 font-semibold";
+  if (u === "this_week") return "bg-amber-50 text-amber-700 font-medium";
+  return "text-slate-500";
+}
 
 // ---------------------------------------------------------------------------
 // Health grouping
@@ -139,6 +167,18 @@ export function Portfolio() {
       if (!map.has(gk)) map.set(gk, []);
       map.get(gk)!.push(p);
     }
+    // Sort needs_spec projects by active spec due date ascending, nulls last
+    const specGroup = map.get("needs_spec");
+    if (specGroup) {
+      specGroup.sort((a, b) => {
+        const da = activeSpecDue(a);
+        const db = activeSpecDue(b);
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return da.localeCompare(db);
+      });
+    }
     return GROUP_ORDER
       .filter((g) => map.has(g.key))
       .map((g) => ({
@@ -146,6 +186,13 @@ export function Portfolio() {
         projects: map.get(g.key)!,
       }));
   }, [filtered]);
+
+  // Count projects in the Needs Spec group whose active spec is overdue.
+  const overdueSpecCount = useMemo(() => {
+    const spec = groups.find((g) => g.key === "needs_spec");
+    if (!spec) return 0;
+    return spec.projects.filter((p) => dueUrgency(activeSpecDue(p)) === "overdue").length;
+  }, [groups]);
 
   const toggleCollapse = (key: string) => {
     setCollapsed((prev) => {
@@ -185,9 +232,30 @@ export function Portfolio() {
             {(error as Error).message}
           </div>
         )}
+        {overdueSpecCount > 0 && (
+          <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="font-semibold">
+              {overdueSpecCount} spec{overdueSpecCount === 1 ? "" : "s"} overdue
+            </span>
+            <span className="text-xs text-red-600">
+              — due date has passed and no completion recorded
+            </span>
+            <button
+              onClick={() => {
+                const el = document.getElementById("group-needs_spec");
+                el?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="ml-auto rounded-md border border-red-300 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
+            >
+              Jump to Needs Spec
+            </button>
+          </div>
+        )}
         {groups.map((group) => (
           <div
             key={group.key}
+            id={`group-${group.key}`}
             className="overflow-hidden rounded-xl border border-slate-200 bg-white"
           >
             {/* Group header */}
@@ -223,13 +291,22 @@ export function Portfolio() {
                       <th className="px-4 py-2">Name</th>
                       <th className="px-4 py-2">Team</th>
                       <th className="px-4 py-2">Health</th>
-                      <th className="px-4 py-2">Phase</th>
+                      {group.key !== "needs_spec" && <th className="px-4 py-2">Phase</th>}
                       <th className="px-4 py-2">Priority</th>
                       <th className="px-4 py-2 text-right">Hours</th>
                       <th className="px-4 py-2">T-Shirt</th>
-                      <th className="px-4 py-2">Start</th>
-                      <th className="px-4 py-2">End</th>
-                      <th className="px-4 py-2 text-right">% Done</th>
+                      {group.key === "needs_spec" ? (
+                        <>
+                          <th className="px-4 py-2">Spec Due</th>
+                          <th className="px-4 py-2">Spec Completed</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="px-4 py-2">Start</th>
+                          <th className="px-4 py-2">End</th>
+                          <th className="px-4 py-2 text-right">% Done</th>
+                        </>
+                      )}
                       <th className="px-4 py-2 w-10" />
                     </tr>
                   </thead>
@@ -270,15 +347,17 @@ export function Portfolio() {
                             {healthText(p.health)}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5">
-                          {(p as any).current_phase ? (
-                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${phaseStyle((p as any).current_phase)}`}>
-                              {(p as any).current_phase}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-300">{"\u2014"}</span>
-                          )}
-                        </td>
+                        {group.key !== "needs_spec" && (
+                          <td className="px-4 py-2.5">
+                            {(p as any).current_phase ? (
+                              <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${phaseStyle((p as any).current_phase)}`}>
+                                {(p as any).current_phase}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-300">{"\u2014"}</span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-4 py-2.5 text-slate-600">
                           {p.priority ?? "\u2014"}
                         </td>
@@ -288,15 +367,28 @@ export function Portfolio() {
                         <td className="px-4 py-2.5 text-slate-600">
                           {p.tshirt_size ?? "\u2014"}
                         </td>
-                        <td className="px-4 py-2.5 text-slate-500 tabular-nums">
-                          {formatDate(p.start_date)}
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-500 tabular-nums">
-                          {formatDate(p.end_date)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
-                          {Math.round(p.pct_complete * 100)}%
-                        </td>
+                        {group.key === "needs_spec" ? (
+                          <>
+                            <td className={cn("px-4 py-2.5 tabular-nums", specDueCellClass(activeSpecDue(p)))}>
+                              {formatDate(activeSpecDue(p))}
+                            </td>
+                            <td className="px-4 py-2.5 text-slate-500 tabular-nums">
+                              {formatDate(shownSpecCompleted(p))}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-2.5 text-slate-500 tabular-nums">
+                              {formatDate(p.start_date)}
+                            </td>
+                            <td className="px-4 py-2.5 text-slate-500 tabular-nums">
+                              {formatDate(p.end_date)}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
+                              {Math.round(p.pct_complete * 100)}%
+                            </td>
+                          </>
+                        )}
                         <td className="px-4 py-2.5">
                           <button
                             onClick={(e) => {

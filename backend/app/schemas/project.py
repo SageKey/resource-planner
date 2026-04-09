@@ -22,6 +22,10 @@ class ProjectOut(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     actual_end: Optional[date] = None
+    functional_spec_due: Optional[date] = None
+    functional_spec_completed: Optional[date] = None
+    technical_spec_due: Optional[date] = None
+    technical_spec_completed: Optional[date] = None
     team: Optional[str] = None
     pm: Optional[str] = None
     ba: Optional[str] = None
@@ -51,6 +55,10 @@ class ProjectOut(BaseModel):
             start_date=p.start_date,
             end_date=p.end_date,
             actual_end=p.actual_end,
+            functional_spec_due=getattr(p, "functional_spec_due", None),
+            functional_spec_completed=getattr(p, "functional_spec_completed", None),
+            technical_spec_due=getattr(p, "technical_spec_due", None),
+            technical_spec_completed=getattr(p, "technical_spec_completed", None),
             team=p.team,
             pm=p.pm,
             ba=p.ba,
@@ -84,6 +92,10 @@ class ProjectCreate(BaseModel):
     priority: Optional[str] = "Medium"
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    functional_spec_due: Optional[date] = None
+    functional_spec_completed: Optional[date] = None
+    technical_spec_due: Optional[date] = None
+    technical_spec_completed: Optional[date] = None
     pm: Optional[str] = None
     tshirt_size: Optional[str] = None
     est_hours: float = 0.0
@@ -105,6 +117,10 @@ class ProjectUpdate(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     actual_end: Optional[date] = None
+    functional_spec_due: Optional[date] = None
+    functional_spec_completed: Optional[date] = None
+    technical_spec_due: Optional[date] = None
+    technical_spec_completed: Optional[date] = None
     team: Optional[str] = None
     pm: Optional[str] = None
     ba: Optional[str] = None

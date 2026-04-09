@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import type { Project } from "@/types/project";
 import { ProjectAssignments } from "./ProjectAssignments";
 import { useRoster } from "@/hooks/useRoster";
@@ -66,6 +67,10 @@ type FormState = {
   end_date: string;
   current_phase: string;
   team: string;
+  functional_spec_due: string;
+  functional_spec_completed: string;
+  technical_spec_due: string;
+  technical_spec_completed: string;
   role_allocations: Record<string, string>;
 };
 
@@ -81,6 +86,10 @@ function blank(): FormState {
     end_date: "",
     current_phase: "",
     team: "",
+    functional_spec_due: "",
+    functional_spec_completed: "",
+    technical_spec_due: "",
+    technical_spec_completed: "",
     role_allocations: Object.fromEntries(ROLE_KEYS.map((r) => [r.key, "0"])),
   };
 }
@@ -108,6 +117,10 @@ function fromProject(p: Project): FormState {
     end_date: p.end_date ?? "",
     current_phase: (p as any).current_phase ?? "",
     team: (p as any).team ?? "",
+    functional_spec_due: p.functional_spec_due ?? "",
+    functional_spec_completed: p.functional_spec_completed ?? "",
+    technical_spec_due: p.technical_spec_due ?? "",
+    technical_spec_completed: p.technical_spec_completed ?? "",
     role_allocations: Object.fromEntries(
       ROLE_KEYS.map((r) => [
         r.key,
@@ -115,6 +128,11 @@ function fromProject(p: Project): FormState {
       ]),
     ),
   };
+}
+
+function healthLabel(h: string | null | undefined): string {
+  if (!h) return "";
+  return h.replace(/^[^\w]*/, "").trim();
 }
 
 export function EditProjectDialog({ project, open, onOpenChange }: Props) {
@@ -173,15 +191,53 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
       est_hours: parseFloat(form.est_hours) || 0,
       current_phase: form.current_phase || null,
       team: form.team || null,
+      functional_spec_due: form.functional_spec_due || null,
+      functional_spec_completed: form.functional_spec_completed || null,
+      technical_spec_due: form.technical_spec_due || null,
+      technical_spec_completed: form.technical_spec_completed || null,
       role_allocations: roleAllocations,
     };
 
+    // Detect whether a completed date is being newly set on this save,
+    // so we can show a toast if the backend auto-transitions health.
+    const funcJustDone =
+      isEdit &&
+      !project?.functional_spec_completed &&
+      !!form.functional_spec_completed;
+    const techJustDone =
+      isEdit &&
+      !project?.technical_spec_completed &&
+      !!form.technical_spec_completed;
+    const priorHealth = project?.health ?? null;
+
     try {
+      let result: Project | undefined;
       if (isEdit) {
-        await updateMutation.mutateAsync(payload as Record<string, unknown> & { id: string });
+        result = await updateMutation.mutateAsync(
+          payload as Record<string, unknown> & { id: string },
+        );
       } else {
-        await createMutation.mutateAsync(payload);
+        result = (await createMutation.mutateAsync(payload)) as Project | undefined;
       }
+
+      // If the backend auto-transitioned health (response health differs
+      // from what the user submitted), show a toast.
+      if (isEdit && result && result.health !== form.health) {
+        if (techJustDone) {
+          toast.success("Technical spec marked complete", {
+            description: `${result.name} moved to ${healthLabel(result.health)}.`,
+          });
+        } else if (funcJustDone) {
+          toast.success("Functional spec marked complete", {
+            description: `${result.name} moved to ${healthLabel(result.health)}.`,
+          });
+        } else if (priorHealth !== result.health) {
+          toast.success("Project updated", {
+            description: `Health: ${healthLabel(result.health)}`,
+          });
+        }
+      }
+
       onOpenChange(false);
     } catch {
       /* error surfaces via mutation.error */
@@ -301,6 +357,52 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
                 ))}
               </select>
             </Field>
+          </div>
+
+          {/* Spec Tracking */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Spec Tracking
+              </div>
+              <div className="text-[10px] text-slate-400">
+                BA owns. Setting a completed date moves the project forward.
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Functional Spec Due">
+                <input
+                  type="date"
+                  value={form.functional_spec_due}
+                  onChange={(e) => set("functional_spec_due", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Functional Spec Completed">
+                <input
+                  type="date"
+                  value={form.functional_spec_completed}
+                  onChange={(e) => set("functional_spec_completed", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Technical Spec Due">
+                <input
+                  type="date"
+                  value={form.technical_spec_due}
+                  onChange={(e) => set("technical_spec_due", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Technical Spec Completed">
+                <input
+                  type="date"
+                  value={form.technical_spec_completed}
+                  onChange={(e) => set("technical_spec_completed", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+            </div>
           </div>
 
           {/* Role Allocations */}

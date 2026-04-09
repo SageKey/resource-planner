@@ -25,30 +25,34 @@ CREATE TABLE IF NOT EXISTS schema_info (
 );
 
 CREATE TABLE IF NOT EXISTS projects (
-    id              TEXT PRIMARY KEY,
-    name            TEXT NOT NULL,
-    type            TEXT,
-    portfolio       TEXT,
-    sponsor         TEXT,
-    health          TEXT,
-    pct_complete    REAL DEFAULT 0.0,
-    priority        TEXT,
-    start_date      TEXT,
-    end_date        TEXT,
-    actual_end      TEXT,
-    team            TEXT,
-    pm              TEXT,
-    ba              TEXT,
-    functional_lead TEXT,
-    technical_lead  TEXT,
-    developer_lead  TEXT,
-    tshirt_size     TEXT,
-    est_hours       REAL DEFAULT 0.0,
-    notes           TEXT,
-    current_phase   TEXT,
-    sort_order      INTEGER,
-    created_at      TEXT DEFAULT (datetime('now')),
-    updated_at      TEXT DEFAULT (datetime('now'))
+    id                         TEXT PRIMARY KEY,
+    name                       TEXT NOT NULL,
+    type                       TEXT,
+    portfolio                  TEXT,
+    sponsor                    TEXT,
+    health                     TEXT,
+    pct_complete               REAL DEFAULT 0.0,
+    priority                   TEXT,
+    start_date                 TEXT,
+    end_date                   TEXT,
+    actual_end                 TEXT,
+    functional_spec_due        TEXT,
+    functional_spec_completed  TEXT,
+    technical_spec_due         TEXT,
+    technical_spec_completed   TEXT,
+    team                       TEXT,
+    pm                         TEXT,
+    ba                         TEXT,
+    functional_lead            TEXT,
+    technical_lead             TEXT,
+    developer_lead             TEXT,
+    tshirt_size                TEXT,
+    est_hours                  REAL DEFAULT 0.0,
+    notes                      TEXT,
+    current_phase              TEXT,
+    sort_order                 INTEGER,
+    created_at                 TEXT DEFAULT (datetime('now')),
+    updated_at                 TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS project_role_allocations (
@@ -225,6 +229,17 @@ class SQLiteConnector:
             self._conn.execute("ALTER TABLE projects ADD COLUMN current_phase TEXT")
         except Exception:
             pass  # already exists
+        # Migration: add spec tracking columns if missing
+        for _col in (
+            "functional_spec_due",
+            "functional_spec_completed",
+            "technical_spec_due",
+            "technical_spec_completed",
+        ):
+            try:
+                self._conn.execute(f"ALTER TABLE projects ADD COLUMN {_col} TEXT")
+            except Exception:
+                pass  # already exists
         self._seed_default_settings()
         self._seed_sdlc_defaults()
         self._conn.commit()
@@ -341,6 +356,7 @@ class SQLiteConnector:
             for rk in ROLE_KEYS:
                 role_allocs.setdefault(rk, 0.0)
 
+            row_keys = row.keys()
             projects.append(Project(
                 id=pid,
                 name=row["name"],
@@ -353,6 +369,10 @@ class SQLiteConnector:
                 start_date=_to_date(row["start_date"]),
                 end_date=_to_date(row["end_date"]),
                 actual_end=_to_date(row["actual_end"]),
+                functional_spec_due=_to_date(row["functional_spec_due"]) if "functional_spec_due" in row_keys else None,
+                functional_spec_completed=_to_date(row["functional_spec_completed"]) if "functional_spec_completed" in row_keys else None,
+                technical_spec_due=_to_date(row["technical_spec_due"]) if "technical_spec_due" in row_keys else None,
+                technical_spec_completed=_to_date(row["technical_spec_completed"]) if "technical_spec_completed" in row_keys else None,
                 team=row["team"],
                 pm=row["pm"],
                 ba=row["ba"],
@@ -364,7 +384,7 @@ class SQLiteConnector:
                 role_allocations=role_allocs,
                 notes=row["notes"],
                 sort_order=row["sort_order"],
-                current_phase=row["current_phase"] if "current_phase" in row.keys() else None,
+                current_phase=row["current_phase"] if "current_phase" in row_keys else None,
             ))
 
         return projects
@@ -537,7 +557,15 @@ class SQLiteConnector:
             )
             proj_fields["updated_at"] = datetime.now().isoformat()
 
-            for date_key in ("start_date", "end_date", "actual_end"):
+            for date_key in (
+                "start_date",
+                "end_date",
+                "actual_end",
+                "functional_spec_due",
+                "functional_spec_completed",
+                "technical_spec_due",
+                "technical_spec_completed",
+            ):
                 val = proj_fields.get(date_key)
                 if val and hasattr(val, "isoformat"):
                     proj_fields[date_key] = val.isoformat()

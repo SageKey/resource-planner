@@ -140,6 +140,10 @@ class Project:
     notes: Optional[str] = None
     sort_order: Optional[int] = None
     current_phase: Optional[str] = None  # discovery, planning, design, build, test, deploy
+    functional_spec_due: Optional[date] = None
+    functional_spec_completed: Optional[date] = None
+    technical_spec_due: Optional[date] = None
+    technical_spec_completed: Optional[date] = None
 
     @property
     def is_active(self) -> bool:
