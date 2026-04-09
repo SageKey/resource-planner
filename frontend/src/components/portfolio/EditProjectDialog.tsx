@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import type { Project } from "@/types/project";
 import { ProjectAssignments } from "./ProjectAssignments";
+import { useRoster } from "@/hooks/useRoster";
 import {
   Dialog,
   DialogContent,
@@ -121,6 +122,13 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
   const [form, setForm] = useState<FormState>(() =>
     project ? fromProject(project) : blank(),
   );
+  const { data: rosterData } = useRoster();
+  const teamList = useMemo(() => {
+    const roster = Array.isArray(rosterData) ? rosterData : [];
+    const teams = new Set(roster.map((m) => m.team).filter(Boolean) as string[]);
+    return Array.from(teams).sort();
+  }, [rosterData]);
+
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
   const mutation = isEdit ? updateMutation : createMutation;
@@ -286,13 +294,12 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
               />
             </Field>
             <Field label="Team">
-              <input
-                type="text"
-                value={form.team}
-                onChange={(e) => set("team", e.target.value)}
-                placeholder="e.g. ERP, PMO"
-                className={inputCls}
-              />
+              <select value={form.team} onChange={(e) => set("team", e.target.value)} className={inputCls}>
+                <option value="">— none —</option>
+                {teamList.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </Field>
           </div>
 
