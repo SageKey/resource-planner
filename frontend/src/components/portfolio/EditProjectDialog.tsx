@@ -64,6 +64,7 @@ type FormState = {
   start_date: string;
   end_date: string;
   current_phase: string;
+  team: string;
   role_allocations: Record<string, string>;
 };
 
@@ -78,6 +79,7 @@ function blank(): FormState {
     start_date: "",
     end_date: "",
     current_phase: "",
+    team: "",
     role_allocations: Object.fromEntries(ROLE_KEYS.map((r) => [r.key, "0"])),
   };
 }
@@ -104,6 +106,7 @@ function fromProject(p: Project): FormState {
     start_date: p.start_date ?? "",
     end_date: p.end_date ?? "",
     current_phase: (p as any).current_phase ?? "",
+    team: (p as any).team ?? "",
     role_allocations: Object.fromEntries(
       ROLE_KEYS.map((r) => [
         r.key,
@@ -161,6 +164,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
       end_date: form.end_date || null,
       est_hours: parseFloat(form.est_hours) || 0,
       current_phase: form.current_phase || null,
+      team: form.team || null,
       role_allocations: roleAllocations,
     };
 
@@ -263,8 +267,8 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
             </Field>
           </div>
 
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Dates + Team */}
+          <div className="grid grid-cols-3 gap-3">
             <Field label="Start Date">
               <input
                 type="date"
@@ -278,6 +282,15 @@ export function EditProjectDialog({ project, open, onOpenChange }: Props) {
                 type="date"
                 value={form.end_date}
                 onChange={(e) => set("end_date", e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Team">
+              <input
+                type="text"
+                value={form.team}
+                onChange={(e) => set("team", e.target.value)}
+                placeholder="e.g. ERP, PMO"
                 className={inputCls}
               />
             </Field>
