@@ -1173,9 +1173,6 @@ class CapacityEngine:
                         grid[week_idx][role_key] += snap.role_demand_hrs
 
         return grid
-                    grid[week_idx][role_key] += weekly_demand
-
-        return grid
 
     def simulate_portfolio_schedule_with_scenario(
         self,
