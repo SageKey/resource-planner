@@ -62,8 +62,8 @@ export function RoleCardsConcept() {
               </span>
             </div>
 
-            {/* Big free number */}
-            <div className="mt-4 flex items-end gap-3">
+            {/* Hero row: Free hours + % allocated */}
+            <div className="mt-4 flex items-end justify-between gap-3">
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Free this week</div>
                 <div className={cn("text-3xl font-bold tabular-nums", stateColor.text)}>
@@ -71,19 +71,33 @@ export function RoleCardsConcept() {
                   <span className="ml-0.5 text-base font-semibold text-slate-400">h</span>
                 </div>
               </div>
-              <div className="mb-1 flex-1 text-right text-[11px] text-slate-400 tabular-nums">
-                {load.consumedHrs}h consumed
+              <div className="text-right">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Allocated</div>
+                <div className={cn("text-xl font-bold tabular-nums", stateColor.text)}>
+                  {Math.round(load.pctUsed * 100)}
+                  <span className="ml-0.5 text-sm font-semibold text-slate-400">%</span>
+                </div>
               </div>
             </div>
 
             {/* Usage bar */}
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${pctWidth}%` }}
-                transition={{ duration: 0.6, delay: 0.25 + i * 0.05, ease: "easeOut" }}
-                className={cn("h-full rounded-full", stateColor.bar)}
-              />
+            <div className="mt-2">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pctWidth}%` }}
+                  transition={{ duration: 0.6, delay: 0.25 + i * 0.05, ease: "easeOut" }}
+                  className={cn("h-full rounded-full", stateColor.bar)}
+                />
+              </div>
+              <div className="mt-1 flex items-center justify-between text-[10px] tabular-nums text-slate-400">
+                <span>
+                  {load.consumedHrs}h consumed
+                </span>
+                <span>
+                  of {role.totalHrsWeek}h capacity
+                </span>
+              </div>
             </div>
 
             {/* Currently working on */}
