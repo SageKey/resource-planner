@@ -166,11 +166,19 @@ function PersonCard({
 
   const barWidth = Math.min(100, pctNow * 100);
 
-  const nextWeeks = [1, 2, 3, 4].map((idx) => ({
-    idx,
-    pct: person.cells[idx] ?? 0,
-    status: statusFromPct(person.cells[idx] ?? 0),
-  }));
+  // "This Month" = rolling 4-week average starting with the current week.
+  // cells[0..3]. Skip undefined cells gracefully for partial data.
+  const monthCells = [0, 1, 2, 3]
+    .map((i) => person.cells[i])
+    .filter((c): c is number => typeof c === "number");
+  const monthPct =
+    monthCells.length > 0
+      ? monthCells.reduce((a, b) => a + b, 0) / monthCells.length
+      : 0;
+  const monthStatus = capacity > 0 ? statusFromPct(monthPct) : "unknown";
+  const monthStyle = STATUS_STYLE[monthStatus];
+  const monthBarWidth = Math.min(100, monthPct * 100);
+  const monthAllocatedHrs = Math.round(monthPct * capacity * 10) / 10;
 
   return (
     <motion.button
@@ -242,103 +250,36 @@ function PersonCard({
         </div>
       </div>
 
-      {/* Next 4 weeks — mini vertical bar chart */}
+      {/* This Month — rolling 4-week summary */}
       <div className="mt-4">
-        <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            Next 4 Weeks
-          </span>
-          <span className="text-[9px] font-medium text-slate-400">100%</span>
+        <div className="mb-1 flex items-end justify-between">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              This Month
+            </div>
+            <div className="text-[9px] text-slate-400">Avg over next 4 weeks</div>
+          </div>
+          <div className={cn("text-lg font-bold tabular-nums", monthStyle.text)}>
+            {Math.round(monthPct * 100)}
+            <span className="ml-0.5 text-xs font-semibold text-slate-400">%</span>
+          </div>
         </div>
-        <NextWeeksChart weeks={nextWeeks} rowIndex={index} />
+        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${monthBarWidth}%` }}
+            transition={{ duration: 0.6, delay: 0.35 + index * 0.04, ease: "easeOut" }}
+            className={cn("h-full rounded-full", monthStyle.bar)}
+          />
+        </div>
+        <div className="mt-1 text-right text-[10px] tabular-nums text-slate-400">
+          {monthAllocatedHrs}h/wk avg
+        </div>
       </div>
     </motion.button>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Mini bar chart for the "Next 4 Weeks" preview
-// ---------------------------------------------------------------------------
-
-interface NextWeekCell {
-  idx: number;
-  pct: number;
-  status: Status;
-}
-
-function NextWeeksChart({ weeks, rowIndex }: { weeks: NextWeekCell[]; rowIndex: number }) {
-  const MAX_PCT = 1.25;
-  const CHART_HEIGHT = 56;
-  const referenceLinePct = 1.0 / MAX_PCT;
-
-  return (
-    <div className="relative rounded-lg border border-slate-100 bg-slate-50/60 p-2">
-      <div className="relative" style={{ height: `${CHART_HEIGHT}px` }}>
-        <div
-          className="pointer-events-none absolute left-0 right-0 border-t border-dashed border-slate-300"
-          style={{ bottom: `${referenceLinePct * 100}%` }}
-        />
-        <div className="absolute inset-0 flex items-end justify-around gap-1.5">
-          {weeks.map((wk) => {
-            const style = STATUS_STYLE[wk.status];
-            const visualPct = Math.min(wk.pct, MAX_PCT) / MAX_PCT;
-            const heightPx = Math.max(4, visualPct * CHART_HEIGHT);
-            return (
-              <div
-                key={wk.idx}
-                className="flex flex-1 flex-col items-center justify-end"
-                title={`Week +${wk.idx}: ${Math.round(wk.pct * 100)}%`}
-              >
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: `${heightPx}px` }}
-                  transition={{
-                    duration: 0.5,
-                    delay: 0.3 + rowIndex * 0.04 + wk.idx * 0.05,
-                    ease: "easeOut",
-                  }}
-                  className={cn(
-                    "w-full rounded-t-sm",
-                    style.bar,
-                    wk.pct > 1.0 && "shadow-sm",
-                  )}
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="mt-1 flex items-center justify-around gap-1.5">
-        {weeks.map((wk) => {
-          const style = STATUS_STYLE[wk.status];
-          return (
-            <div
-              key={`pct-${wk.idx}`}
-              className={cn(
-                "flex-1 text-center text-[10px] font-bold tabular-nums",
-                style.text,
-              )}
-            >
-              {Math.round(wk.pct * 100)}%
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="mt-0.5 flex items-center justify-around gap-1.5">
-        {weeks.map((wk) => (
-          <div
-            key={`lbl-${wk.idx}`}
-            className="flex-1 text-center text-[9px] font-medium text-slate-400"
-          >
-            +{wk.idx}w
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Person detail modal
