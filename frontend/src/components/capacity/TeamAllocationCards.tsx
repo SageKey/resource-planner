@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Briefcase, Clock, Users, X } from "lucide-react";
+import { ArrowLeft, Briefcase, ChevronRight, Clock, Users, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useAssignmentMatrix, type MatrixData } from "@/hooks/useAssignments";
@@ -370,6 +370,9 @@ function PersonDetailModal({
   const status = capacity > 0 ? statusFromPct(pctNow) : "unknown";
   const style = STATUS_STYLE[status];
 
+  // Drill-down state: which project the user clicked into (if any)
+  const [selectedProject, setSelectedProject] = useState<PersonAssignedProject | null>(null);
+
   // 26-week average utilization (cells average)
   const avgPct = useMemo(() => {
     if (person.cells.length === 0) return 0;
@@ -411,6 +414,20 @@ function PersonDetailModal({
 
   const barWidth = Math.min(100, pctNow * 100);
   const avgBarWidth = Math.min(100, avgPct * 100);
+
+  // If a project is selected, show the project drill-down view instead of
+  // the person view. Back button returns to the person view.
+  if (selectedProject) {
+    return (
+      <ProjectDrillDown
+        project={selectedProject}
+        fromPerson={person}
+        matrix={matrix}
+        onBack={() => setSelectedProject(null)}
+        onClose={onClose}
+      />
+    );
+  }
 
   return (
     <div
@@ -538,7 +555,11 @@ function PersonDetailModal({
           ) : (
             <div className="space-y-2">
               {assignedProjects.map((p) => (
-                <AssignedProjectRow key={`${p.id}-${p.role_key}`} project={p} />
+                <AssignedProjectRow
+                  key={`${p.id}-${p.role_key}`}
+                  project={p}
+                  onClick={() => setSelectedProject(p)}
+                />
               ))}
             </div>
           )}
@@ -548,17 +569,28 @@ function PersonDetailModal({
   );
 }
 
-function AssignedProjectRow({ project }: { project: PersonAssignedProject }) {
+function AssignedProjectRow({
+  project,
+  onClick,
+}: {
+  project: PersonAssignedProject;
+  onClick: () => void;
+}) {
   const allocPct = Math.round(project.allocation_pct * 100);
   const healthLabel = project.health ? project.health.replace(/^[^\w]*/, "").trim() : "Unknown";
   const roleLabel = ROLE_SHORT[project.role_key] ?? project.role_key;
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+    <button
+      onClick={onClick}
+      className="group flex w-full items-center gap-3 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-left transition-all hover:border-slate-200 hover:bg-white hover:shadow-sm"
+    >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-mono text-[10px] text-slate-400">{project.id}</span>
-          <span className="truncate text-sm font-medium text-slate-800">{project.name}</span>
+          <span className="truncate text-sm font-medium text-slate-800 group-hover:text-slate-900">
+            {project.name}
+          </span>
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500">
           <span className="inline-flex items-center gap-1">
@@ -585,7 +617,8 @@ function AssignedProjectRow({ project }: { project: PersonAssignedProject }) {
         </div>
         <div className="text-sm font-bold tabular-nums text-slate-700">{allocPct}%</div>
       </div>
-    </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
+    </button>
   );
 }
 
@@ -601,3 +634,251 @@ const ROLE_SHORT: Record<string, string> = {
   "wms consultant": "WMS",
   wms: "WMS",
 };
+
+// ---------------------------------------------------------------------------
+// Project drill-down view
+// ---------------------------------------------------------------------------
+
+/**
+ * ProjectDrillDown — the "Person → Project" drill-down panel. Rendered in
+ * place of the PersonDetailModal body when a user clicks an assigned
+ * project row. Shows the project header, quick facts, and the full team
+ * roster (everyone assigned to this project grouped by role), with the
+ * originating person highlighted.
+ *
+ * A back button returns to the person view without closing the modal.
+ */
+
+interface ProjectTeamMember {
+  name: string;
+  role_key: string;
+  allocation_pct: number;
+  role_label: string;
+  team: string | null;
+  capacity_hrs_week: number;
+}
+
+function ProjectDrillDown({
+  project,
+  fromPerson,
+  matrix,
+  onBack,
+  onClose,
+}: {
+  project: PersonAssignedProject;
+  fromPerson: PersonHeatmapRow;
+  matrix: MatrixData | undefined;
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  // Build the full team on this project from the assignment matrix.
+  // The matrix is keyed project_id → person_name → {role_key, allocation_pct}.
+  const team: ProjectTeamMember[] = useMemo(() => {
+    if (!matrix) return [];
+    const personByName: Record<string, MatrixData["people"][number]> = {};
+    for (const p of matrix.people) {
+      personByName[p.name] = p;
+    }
+    const projectAssignments = matrix.assignments[project.id] ?? {};
+
+    const out: ProjectTeamMember[] = [];
+    for (const [personName, entry] of Object.entries(projectAssignments)) {
+      const person = personByName[personName];
+      out.push({
+        name: personName,
+        role_key: entry.role_key,
+        allocation_pct: entry.allocation_pct,
+        role_label: person?.role ?? entry.role_key,
+        team: person?.team ?? null,
+        capacity_hrs_week: person?.capacity_hrs_week ?? 0,
+      });
+    }
+    // Sort by role order first (PM, BA, Functional, Technical, Developer, Infra, DBA, ERP),
+    // then by allocation % desc within each role, then by name
+    const ROLE_ORDER = [
+      "pm",
+      "ba",
+      "functional",
+      "technical",
+      "developer",
+      "infrastructure",
+      "dba",
+      "erp",
+      "wms",
+      "wms consultant",
+    ];
+    const roleIdx = (rk: string) => {
+      const i = ROLE_ORDER.indexOf(rk);
+      return i < 0 ? 99 : i;
+    };
+    out.sort((a, b) => {
+      const r = roleIdx(a.role_key) - roleIdx(b.role_key);
+      if (r !== 0) return r;
+      const alloc = b.allocation_pct - a.allocation_pct;
+      if (alloc !== 0) return alloc;
+      return a.name.localeCompare(b.name);
+    });
+    return out;
+  }, [matrix, project.id]);
+
+  // Group team by role for display
+  const teamByRole: { role_key: string; members: ProjectTeamMember[] }[] = useMemo(() => {
+    const groups: Record<string, ProjectTeamMember[]> = {};
+    for (const m of team) {
+      if (!groups[m.role_key]) groups[m.role_key] = [];
+      groups[m.role_key].push(m);
+    }
+    return Object.entries(groups).map(([role_key, members]) => ({ role_key, members }));
+  }, [team]);
+
+  const totalAllocated = team.reduce((s, m) => s + m.allocation_pct, 0);
+  const healthLabel = project.health
+    ? project.health.replace(/^[^\w]*/, "").trim()
+    : "Unknown";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl bg-white shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Back / breadcrumb header */}
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-2.5">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-600 transition-colors hover:text-slate-900"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to {fromPerson.name}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Project header */}
+        <div className="border-b border-slate-100 px-6 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="font-mono text-[10px] text-slate-400">{project.id}</div>
+              <div className="mt-0.5 text-base font-semibold text-slate-900">{project.name}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {project.priority && (
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                    {project.priority} priority
+                  </span>
+                )}
+                {project.health && (
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                    {healthLabel}
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                  <Clock className="h-2.5 w-2.5" />
+                  <span className="tabular-nums">
+                    {project.est_hours.toLocaleString()}h total
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Team roster */}
+        <div className="p-6">
+          <div className="mb-3 flex items-center gap-2">
+            <Users className="h-4 w-4 text-slate-500" />
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+              Project Team
+            </div>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+              {team.length} {team.length === 1 ? "person" : "people"}
+            </span>
+            {totalAllocated > 0 && (
+              <span className="ml-auto text-[10px] tabular-nums text-slate-400">
+                {Math.round(totalAllocated * 100)}% total allocated
+              </span>
+            )}
+          </div>
+
+          {team.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-xs text-slate-400">
+              No team members assigned yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {teamByRole.map(({ role_key, members }) => (
+                <div key={role_key}>
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    {ROLE_SHORT[role_key] ?? role_key}
+                  </div>
+                  <div className="space-y-1.5">
+                    {members.map((member) => {
+                      const isFromPerson = member.name === fromPerson.name;
+                      return (
+                        <div
+                          key={member.name}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg border px-3 py-2",
+                            isFromPerson
+                              ? "border-emerald-200 bg-emerald-50"
+                              : "border-slate-100 bg-slate-50/60",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                              isFromPerson
+                                ? "bg-emerald-200 text-emerald-800"
+                                : "bg-slate-200 text-slate-600",
+                            )}
+                          >
+                            {initials(member.name)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  "truncate text-sm font-medium",
+                                  isFromPerson ? "text-emerald-900" : "text-slate-800",
+                                )}
+                              >
+                                {member.name}
+                              </span>
+                              {isFromPerson && (
+                                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700">
+                                  Viewing
+                                </span>
+                              )}
+                            </div>
+                            {member.team && (
+                              <div className="mt-0.5 text-[10px] text-slate-500">
+                                {member.team} · {member.capacity_hrs_week.toFixed(0)}h/wk
+                              </div>
+                            )}
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <div className="text-sm font-bold tabular-nums text-slate-700">
+                              {Math.round(member.allocation_pct * 100)}%
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
