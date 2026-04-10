@@ -215,30 +215,108 @@ function PersonCard({ person, index }: { person: PersonHeatmapRow; index: number
         </div>
       </div>
 
-      {/* Next 4 weeks strip */}
+      {/* Next 4 weeks — mini vertical bar chart */}
       <div className="mt-4">
-        <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-          Next 4 Weeks
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            Next 4 Weeks
+          </span>
+          <span className="text-[9px] font-medium text-slate-400">100%</span>
         </div>
-        <div className="flex gap-1.5">
-          {nextWeeks.map((wk) => {
-            const s = STATUS_STYLE[wk.status];
+        <NextWeeksChart weeks={nextWeeks} rowIndex={index} />
+      </div>
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mini bar chart for the "Next 4 Weeks" preview
+// ---------------------------------------------------------------------------
+
+interface NextWeekCell {
+  idx: number;
+  pct: number;
+  status: Status;
+}
+
+function NextWeeksChart({ weeks, rowIndex }: { weeks: NextWeekCell[]; rowIndex: number }) {
+  // Visual scale: cap at 125% for bar height so over-capacity weeks read
+  // distinctly without blowing the layout. The 100% reference line sits
+  // at 80% of the chart height.
+  const MAX_PCT = 1.25;
+  const CHART_HEIGHT = 56; // px
+  const referenceLinePct = 1.0 / MAX_PCT; // where the 100% line sits (0..1)
+
+  return (
+    <div className="relative rounded-lg border border-slate-100 bg-slate-50/60 p-2">
+      {/* Chart area with reference line */}
+      <div className="relative" style={{ height: `${CHART_HEIGHT}px` }}>
+        {/* 100% reference line */}
+        <div
+          className="pointer-events-none absolute left-0 right-0 border-t border-dashed border-slate-300"
+          style={{ bottom: `${referenceLinePct * 100}%` }}
+        />
+        {/* Bars */}
+        <div className="absolute inset-0 flex items-end justify-around gap-1.5">
+          {weeks.map((wk) => {
+            const style = STATUS_STYLE[wk.status];
+            const visualPct = Math.min(wk.pct, MAX_PCT) / MAX_PCT;
+            const heightPx = Math.max(4, visualPct * CHART_HEIGHT);
             return (
               <div
                 key={wk.idx}
-                className={cn(
-                  "flex flex-1 items-center justify-center rounded-md py-1 text-[10px] font-semibold tabular-nums",
-                  s.pillBg,
-                  s.pillText,
-                )}
-                title={`Week +${wk.idx}`}
+                className="flex flex-1 flex-col items-center justify-end"
+                title={`Week +${wk.idx}: ${Math.round(wk.pct * 100)}%`}
               >
-                {Math.round(wk.pct * 100)}%
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: `${heightPx}px` }}
+                  transition={{
+                    duration: 0.5,
+                    delay: 0.3 + rowIndex * 0.04 + wk.idx * 0.05,
+                    ease: "easeOut",
+                  }}
+                  className={cn(
+                    "w-full rounded-t-sm",
+                    style.bar,
+                    wk.pct > 1.0 && "shadow-sm",
+                  )}
+                />
               </div>
             );
           })}
         </div>
       </div>
-    </motion.div>
+
+      {/* Percent labels */}
+      <div className="mt-1 flex items-center justify-around gap-1.5">
+        {weeks.map((wk) => {
+          const style = STATUS_STYLE[wk.status];
+          return (
+            <div
+              key={`pct-${wk.idx}`}
+              className={cn(
+                "flex-1 text-center text-[10px] font-bold tabular-nums",
+                style.text,
+              )}
+            >
+              {Math.round(wk.pct * 100)}%
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Week labels */}
+      <div className="mt-0.5 flex items-center justify-around gap-1.5">
+        {weeks.map((wk) => (
+          <div
+            key={`lbl-${wk.idx}`}
+            className="flex-1 text-center text-[9px] font-medium text-slate-400"
+          >
+            +{wk.idx}w
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
