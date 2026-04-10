@@ -55,9 +55,24 @@ interface Props {
   /** Optional small note rendered right under the title, explaining what
    *  the hero numbers represent in this view (e.g. "This week · peak below"). */
   titleNote?: string;
+  /** Optional "project-average" (v1 aggregate) utilization per role. When
+   *  provided, renders an extra "Total" column next to Util %. Used by the
+   *  v2 page to show the steady-state baseline alongside current-week load
+   *  without having to add another chart. The label in the header for the
+   *  Util % column switches to "This Wk" when this prop is present so the
+   *  distinction between current-week and total is obvious. */
+  totalByRole?: Record<string, number>;
 }
 
-export function UtilizationBars({ roles, coverage, assignments, title, roleSubtext, titleNote }: Props) {
+export function UtilizationBars({
+  roles,
+  coverage,
+  assignments,
+  title,
+  roleSubtext,
+  titleNote,
+  totalByRole,
+}: Props) {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
 
   if (!roles) return null;
@@ -92,7 +107,8 @@ export function UtilizationBars({ roles, coverage, assignments, title, roleSubte
           <tr className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
             <th className="pb-2 text-left w-28">Role</th>
             <th className="pb-2 text-left">Utilization</th>
-            <th className="pb-2 text-right w-14">Util %</th>
+            <th className="pb-2 text-right w-14">{totalByRole ? "This Wk" : "Util %"}</th>
+            {totalByRole && <th className="pb-2 text-right w-14">Total</th>}
             <th className="pb-2 text-right w-16">Demand</th>
             <th className="pb-2 text-right w-16">Supply</th>
             {hasCoverage && (
@@ -153,6 +169,11 @@ export function UtilizationBars({ roles, coverage, assignments, title, roleSubte
                     {Math.round(role.utilization_pct * 100)}%
                   </span>
                 </td>
+                {totalByRole && (
+                  <td className="py-2 text-right text-xs font-medium tabular-nums text-slate-600">
+                    {Math.round((totalByRole[role.role_key] ?? 0) * 100)}%
+                  </td>
+                )}
                 <td className="py-2 text-right text-xs tabular-nums text-slate-600">
                   {role.demand_hrs_week.toFixed(0)}h
                 </td>

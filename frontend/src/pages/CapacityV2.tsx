@@ -47,7 +47,7 @@ export function CapacityV2() {
   const heat = useHeatmapV2(26);
   const personHeat = usePersonHeatmapV2(26);
 
-  const { rolesForBars, peakSubtext } = useMemo(
+  const { rolesForBars, totalByRole } = useMemo(
     () => buildCurrentWeekBars(util.data, heat.data),
     [util.data, heat.data],
   );
@@ -74,9 +74,9 @@ export function CapacityV2() {
             roles={rolesForBars}
             coverage={coverage.data}
             assignments={matrix.data?.assignments}
-            title="Role Utilization — This Week"
-            titleNote="Hero numbers show current-week load under the Simplified SDLC. Peak-next-13-weeks shown under each role."
-            roleSubtext={peakSubtext}
+            title="Role Utilization"
+            titleNote="Bar and ‘This Wk’ show current-week load under the Simplified SDLC. ‘Total’ is the project-average baseline. See the heatmap below for the full 26-week forward view."
+            totalByRole={totalByRole}
           />
         )}
 
@@ -106,18 +106,20 @@ export function CapacityV2() {
  * the heatmap's first cell. Supply and demand_breakdown are preserved
  * from the aggregate response so the detail modal keeps working.
  *
- * Also computes a per-role "Peak 13w: X%" subtext string for display
- * under each role name.
+ * Also returns a `totalByRole` map keyed by role_key holding the original
+ * project-average utilization (the v1/v2 aggregate — phase-invariant).
+ * UtilizationBars uses this to render a "Total" column next to the
+ * "This Wk" column.
  */
 function buildCurrentWeekBars(
   utilData: UtilizationResponse | undefined,
   heatData: HeatmapResponse | undefined,
 ): {
   rolesForBars: Record<string, RoleUtilizationOut> | null;
-  peakSubtext: Record<string, string>;
+  totalByRole: Record<string, number>;
 } {
   if (!utilData?.roles || !heatData?.rows) {
-    return { rolesForBars: null, peakSubtext: {} };
+    return { rolesForBars: null, totalByRole: {} };
   }
 
   // Build a quick lookup of heatmap rows by role_key
@@ -133,12 +135,13 @@ function buildCurrentWeekBars(
   }
 
   const rolesForBars: Record<string, RoleUtilizationOut> = {};
-  const peakSubtext: Record<string, string> = {};
-
-  // The 13-week peak window — roughly one quarter forward
-  const PEAK_WINDOW = 13;
+  const totalByRole: Record<string, number> = {};
 
   for (const [roleKey, aggRole] of Object.entries(utilData.roles)) {
+    // Capture the original aggregate (project-average) number BEFORE we
+    // overwrite utilization_pct with current-week.
+    totalByRole[roleKey] = aggRole.utilization_pct;
+
     const hr = heatByRole[roleKey];
     if (!hr) {
       // Role doesn't appear in heatmap (e.g., no supply) — fall back to
@@ -151,10 +154,6 @@ function buildCurrentWeekBars(
     const supplyHrs = hr.supply;
     const currentDemandHrs = currentPct * supplyHrs;
 
-    // Peak over next 13 weeks (or however many cells we have)
-    const windowCells = hr.cells.slice(0, PEAK_WINDOW);
-    const peakPct = windowCells.length > 0 ? Math.max(...windowCells) : 0;
-
     rolesForBars[roleKey] = {
       ...aggRole,
       supply_hrs_week: supplyHrs,
@@ -162,11 +161,9 @@ function buildCurrentWeekBars(
       utilization_pct: currentPct,
       status: statusFromPct(currentPct, supplyHrs, currentDemandHrs),
     };
-
-    peakSubtext[roleKey] = `Peak next 13w: ${Math.round(peakPct * 100)}%`;
   }
 
-  return { rolesForBars, peakSubtext };
+  return { rolesForBars, totalByRole };
 }
 
 /** Map a 0..∞ utilization ratio to the backend's status string codes.
