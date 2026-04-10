@@ -5,6 +5,8 @@ import { cn } from "@/lib/cn";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useAssignmentMatrix, type MatrixData } from "@/hooks/useAssignments";
 import type { PersonHeatmapResponse, PersonHeatmapRow } from "@/hooks/useCapacity";
+import { usePersonHeatmapDetailV2 } from "@/hooks/useCapacityV2";
+import { mapV1PhaseToV2, v2PhaseLabel, v2PhaseStyle } from "@/lib/phaseModelV2";
 
 /**
  * TeamAllocationCards
@@ -314,15 +316,41 @@ function PersonDetailModal({
   // Drill-down state: which project the user clicked into (if any)
   const [selectedProject, setSelectedProject] = useState<PersonAssignedProject | null>(null);
 
-  // 26-week average utilization (cells average)
-  const avgPct = useMemo(() => {
-    if (person.cells.length === 0) return 0;
-    const sum = person.cells.reduce((a, b) => a + b, 0);
-    return sum / person.cells.length;
+  // Fetch per-project current-week breakdown for this person. Used to
+  // annotate each project row in the list with "Xh this week · [phase]".
+  const detail = usePersonHeatmapDetailV2(person.name, 0);
+
+  // Build a lookup: project_id → { hours this week, phase }
+  // Only the projects currently consuming hours show up here. Projects
+  // assigned but idle this week get 0h by default.
+  const currentWeekByProjectId: Record<string, { hours: number; phase: string }> =
+    useMemo(() => {
+      const out: Record<string, { hours: number; phase: string }> = {};
+      if (detail.data?.projects) {
+        for (const p of detail.data.projects) {
+          const prev = out[p.project_id];
+          out[p.project_id] = {
+            hours: (prev?.hours ?? 0) + p.demand_hrs,
+            phase: p.phase,
+          };
+        }
+      }
+      return out;
+    }, [detail.data]);
+
+  // "This Month" = rolling 4-week average starting with the current week.
+  // Matches the card's This Month metric.
+  const monthPct = useMemo(() => {
+    const monthCells = [0, 1, 2, 3]
+      .map((i) => person.cells[i])
+      .filter((c): c is number => typeof c === "number");
+    if (monthCells.length === 0) return 0;
+    return monthCells.reduce((a, b) => a + b, 0) / monthCells.length;
   }, [person.cells]);
 
-  const avgStatus = statusFromPct(avgPct);
-  const avgStyle = STATUS_STYLE[avgStatus];
+  const monthStatus = capacity > 0 ? statusFromPct(monthPct) : "unknown";
+  const monthStyle = STATUS_STYLE[monthStatus];
+  const monthAllocatedHrs = Math.round(monthPct * capacity * 10) / 10;
 
   // Build the project list from the assignment matrix
   const assignedProjects: PersonAssignedProject[] = useMemo(() => {
@@ -354,7 +382,7 @@ function PersonDetailModal({
   }, [matrix, person.name]);
 
   const barWidth = Math.min(100, pctNow * 100);
-  const avgBarWidth = Math.min(100, avgPct * 100);
+  const monthBarWidth = Math.min(100, monthPct * 100);
 
   // If a project is selected, show the project drill-down view instead of
   // the person view. Back button returns to the person view.
@@ -444,35 +472,35 @@ function PersonDetailModal({
             </div>
           </div>
 
-          {/* 26-Week Average (Total) */}
+          {/* This Month (rolling 4-week avg, matches the card) */}
           <div className="rounded-lg border border-slate-200 p-4">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Total — Avg 26 Weeks
+              This Month
             </div>
             <div className="mt-2 flex items-end justify-between gap-2">
               <div>
-                <div className={cn("text-3xl font-bold tabular-nums", avgStyle.text)}>
-                  {Math.round(avgPct * 100)}
+                <div className={cn("text-3xl font-bold tabular-nums", monthStyle.text)}>
+                  {Math.round(monthPct * 100)}
                   <span className="ml-0.5 text-base font-semibold text-slate-400">%</span>
                 </div>
                 <div className="mt-0.5 text-[11px] tabular-nums text-slate-500">
-                  Project-average load across the visible horizon
+                  {monthAllocatedHrs}h/wk avg · rolling 4-week window
                 </div>
               </div>
               <span
                 className={cn(
                   "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                  avgStyle.pillBg,
-                  avgStyle.pillText,
+                  monthStyle.pillBg,
+                  monthStyle.pillText,
                 )}
               >
-                {avgStyle.label}
+                {monthStyle.label}
               </span>
             </div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
-                className={cn("h-full rounded-full", avgStyle.bar)}
-                style={{ width: `${avgBarWidth}%` }}
+                className={cn("h-full rounded-full", monthStyle.bar)}
+                style={{ width: `${monthBarWidth}%` }}
               />
             </div>
           </div>
@@ -495,13 +523,18 @@ function PersonDetailModal({
             </div>
           ) : (
             <div className="space-y-2">
-              {assignedProjects.map((p) => (
-                <AssignedProjectRow
-                  key={`${p.id}-${p.role_key}`}
-                  project={p}
-                  onClick={() => setSelectedProject(p)}
-                />
-              ))}
+              {assignedProjects.map((p) => {
+                const weekInfo = currentWeekByProjectId[p.id];
+                return (
+                  <AssignedProjectRow
+                    key={`${p.id}-${p.role_key}`}
+                    project={p}
+                    currentWeekHours={weekInfo?.hours ?? 0}
+                    currentPhase={weekInfo?.phase ?? null}
+                    onClick={() => setSelectedProject(p)}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
@@ -512,14 +545,26 @@ function PersonDetailModal({
 
 function AssignedProjectRow({
   project,
+  currentWeekHours,
+  currentPhase,
   onClick,
 }: {
   project: PersonAssignedProject;
+  currentWeekHours: number;
+  currentPhase: string | null;
   onClick: () => void;
 }) {
   const allocPct = Math.round(project.allocation_pct * 100);
   const healthLabel = project.health ? project.health.replace(/^[^\w]*/, "").trim() : "Unknown";
   const roleLabel = ROLE_SHORT[project.role_key] ?? project.role_key;
+
+  // Map v1 phase string (if any) to v2 labels for consistency with the v2 page
+  const v2Phase = mapV1PhaseToV2(currentPhase);
+  const v2PhaseLbl = v2Phase ? v2PhaseLabel(v2Phase) : null;
+  const hasHoursThisWeek = currentWeekHours >= 0.05;
+  const hoursDisplay = hasHoursThisWeek
+    ? `${currentWeekHours.toFixed(1)}h this week`
+    : "No work this week";
 
   return (
     <button
@@ -549,6 +594,28 @@ function AssignedProjectRow({
               <span>·</span>
               <span>{healthLabel}</span>
             </>
+          )}
+        </div>
+        {/* This-week breakdown line (connective tissue between the hero
+            numbers above and the assigned projects below) */}
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 text-[10px] font-semibold tabular-nums",
+              hasHoursThisWeek ? "text-slate-700" : "text-slate-400",
+            )}
+          >
+            {hoursDisplay}
+          </span>
+          {v2PhaseLbl && (
+            <span
+              className={cn(
+                "rounded-full px-1.5 py-0.5 text-[9px] font-medium",
+                v2PhaseStyle(v2Phase),
+              )}
+            >
+              {v2PhaseLbl}
+            </span>
           )}
         </div>
       </div>

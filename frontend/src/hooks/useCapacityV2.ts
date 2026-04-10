@@ -4,6 +4,7 @@ import type { UtilizationResponse, HeatmapResponse } from "@/types/capacity";
 import type {
   RoleCoverage,
   PersonHeatmapResponse,
+  PersonHeatmapDetail,
 } from "@/hooks/useCapacity";
 
 /**
@@ -50,5 +51,21 @@ export function useAssignmentCoverageV2() {
       api
         .get("/capacity/assignment-coverage", { params: V2_PARAM })
         .then((r) => r.data),
+  });
+}
+
+export function usePersonHeatmapDetailV2(
+  personName: string | null,
+  weekIdx: number | null,
+) {
+  return useQuery<PersonHeatmapDetail>({
+    queryKey: ["capacity", "person-heatmap-detail", "v2", personName, weekIdx],
+    queryFn: () =>
+      api
+        .get("/capacity/person-heatmap-detail", {
+          params: { person_name: personName, week_idx: weekIdx, ...V2_PARAM },
+        })
+        .then((r) => r.data),
+    enabled: personName !== null && weekIdx !== null,
   });
 }
