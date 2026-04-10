@@ -10,6 +10,9 @@ from .models import (
     ProjectAssignment,
     ROLE_KEYS,
     SDLC_PHASES,
+    SDLC_PHASES_V2,
+    DEFAULT_PHASE_WEIGHTS_V2,
+    DEFAULT_ROLE_PHASE_EFFORTS_V2,
     HEALTH_OPTIONS,
     PRIORITY_OPTIONS,
     TSHIRT_OPTIONS,
@@ -23,6 +26,7 @@ from .capacity_engine import (
     RoleUtilization,
     WeeklySnapshot,
     _utilization_status,
+    build_v2_assumptions,
 )
 from .schedule_optimizer import ScheduleOptimizer
 
@@ -33,6 +37,7 @@ __all__ = [
     "RoleUtilization",
     "WeeklySnapshot",
     "_utilization_status",
+    "build_v2_assumptions",
     "ScheduleOptimizer",
     "Project",
     "TeamMember",
@@ -40,6 +45,9 @@ __all__ = [
     "ProjectAssignment",
     "ROLE_KEYS",
     "SDLC_PHASES",
+    "SDLC_PHASES_V2",
+    "DEFAULT_PHASE_WEIGHTS_V2",
+    "DEFAULT_ROLE_PHASE_EFFORTS_V2",
     "HEALTH_OPTIONS",
     "PRIORITY_OPTIONS",
     "TSHIRT_OPTIONS",

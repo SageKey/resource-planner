@@ -269,21 +269,41 @@ def _apply_scenario_modifications(data: dict, modifications: list) -> None:
 class CapacityEngine:
     """Calculates resource utilization from PMO workbook data."""
 
-    def __init__(self, connector=None):
+    def __init__(self, connector=None, assumptions_override: Optional[RMAssumptions] = None):
+        """
+        Args:
+            connector: SQLite connector used to load project / roster data.
+            assumptions_override: Optional RMAssumptions instance that replaces
+                the one loaded from the database. Used by the v2 "Simplified SDLC"
+                view to inject 3-phase weights and role efforts without touching
+                the v1 assumptions tables. When provided, the engine loads
+                projects, roster, and assignments from the connector as usual
+                but swaps `assumptions` for the override.
+        """
         if connector is None:
             from .sqlite_connector import SQLiteConnector
             connector = SQLiteConnector()
         self.connector = connector
         self._data = None
+        self._assumptions_override = assumptions_override
 
     def _load(self):
         if self._data is None:
             self._data = self.connector.load_all()
+            if self._assumptions_override is not None:
+                self._data["assumptions"] = self._assumptions_override
         return self._data
 
     @property
     def assumptions(self) -> RMAssumptions:
         return self._load()["assumptions"]
+
+    @property
+    def phase_list(self) -> list[str]:
+        """Ordered list of SDLC phase keys from the active assumptions.
+        Replaces hardcoded SDLC_PHASES references so the engine supports both
+        v1 (6 phases) and v2 (3 phases) transparently."""
+        return list(self.assumptions.sdlc_phase_weights.keys())
 
     @property
     def active_projects(self) -> list[Project]:
@@ -487,7 +507,7 @@ class CapacityEngine:
             # phase_weight = fraction of project duration in this phase
             # weekly = total_role_hrs × phase_effort / (duration × phase_weight)
             phase_weekly = {}
-            for phase in SDLC_PHASES:
+            for phase in self.phase_list:
                 phase_effort = role_phase_efforts[role_key].get(phase, 0.0)
                 pw = phase_weights.get(phase, 0.0)
                 if pw > 0:
@@ -717,9 +737,10 @@ class CapacityEngine:
 
         # Determine phase boundaries
         phase_weights = self.assumptions.sdlc_phase_weights
+        phase_list = self.phase_list
         phase_boundaries = []  # (phase_name, start_day, end_day)
         cumulative = 0
-        for phase in SDLC_PHASES:
+        for phase in phase_list:
             weight = phase_weights.get(phase, 0.0)
             phase_days = round(duration_days * weight)
             phase_boundaries.append((phase, cumulative, cumulative + phase_days))
@@ -736,7 +757,7 @@ class CapacityEngine:
                 day_offset = (current - project.start_date).days
 
                 # Determine which phase this week falls in
-                current_phase = SDLC_PHASES[-1]  # default to last
+                current_phase = phase_list[-1]  # default to last
                 for phase_name, start_day, end_day in phase_boundaries:
                     if start_day <= day_offset < end_day:
                         current_phase = phase_name
@@ -799,7 +820,7 @@ class CapacityEngine:
             role_totals[role_key] = role_hours
 
             phase_hours = {}
-            for phase in SDLC_PHASES:
+            for phase in self.phase_list:
                 effort_pct = role_phase_efforts[role_key].get(phase, 0.0)
                 phase_hours[phase] = role_hours * effort_pct
             role_breakdown[role_key] = phase_hours
@@ -813,7 +834,7 @@ class CapacityEngine:
         phase_detail = []
         total_weeks = 0.0
 
-        for phase in SDLC_PHASES:
+        for phase in self.phase_list:
             phase_total_hrs = sum(
                 role_breakdown[r].get(phase, 0.0) for r in role_breakdown
             )
@@ -963,7 +984,7 @@ class CapacityEngine:
             # Phase boundaries for this project
             phase_bounds = []
             cumulative = 0
-            for phase in SDLC_PHASES:
+            for phase in self.phase_list:
                 w = phase_weights.get(phase, 0.0)
                 pd = round(proj_duration_days * w)
                 phase_bounds.append((phase, cumulative, cumulative + pd))
@@ -987,7 +1008,7 @@ class CapacityEngine:
                     # Which phase is this week in?
                     day_offset = (week_start - project.start_date).days
                     day_offset = max(0, day_offset)
-                    current_phase = SDLC_PHASES[-1]
+                    current_phase = self.phase_list[-1]
                     for pname, ps, pe in phase_bounds:
                         if ps <= day_offset < pe:
                             current_phase = pname
@@ -1164,7 +1185,7 @@ class CapacityEngine:
             # Phase boundaries
             phase_bounds = []
             cumulative = 0
-            for phase in SDLC_PHASES:
+            for phase in self.phase_list:
                 w = phase_weights.get(phase, 0.0)
                 pd_days = round(proj_duration_days * w)
                 phase_bounds.append((phase, cumulative, cumulative + pd_days))
@@ -1183,7 +1204,7 @@ class CapacityEngine:
                         continue
 
                     day_offset = max(0, (week_start - project.start_date).days)
-                    current_phase = SDLC_PHASES[-1]
+                    current_phase = self.phase_list[-1]
                     for pname, ps, pe in phase_bounds:
                         if ps <= day_offset < pe:
                             current_phase = pname
@@ -1622,6 +1643,83 @@ class CapacityEngine:
                 roles = {k: f"{v:.0%}" for k, v in p.role_allocations.items() if v > 0}
                 print(f"  {p.id:<10} {p.name:<40} {p.priority:<10} "
                       f"{p.est_hours:.0f}h  roles={roles}")
+
+
+# ---------------------------------------------------------------------------
+# v2 "Simplified SDLC" assumptions helper
+# ---------------------------------------------------------------------------
+
+def build_v2_assumptions(base_assumptions: Optional[RMAssumptions] = None) -> RMAssumptions:
+    """Build an RMAssumptions instance populated with the v2 (3-phase)
+    Simplified SDLC constants.
+
+    Used by the `get_capacity` dependency when `?phase_model=v2` is passed,
+    so that the engine computes demand using Planning / Execution /
+    Testing-Go Live weights and role efforts instead of the 6-phase v1 model.
+
+    The non-phase fields (supply_by_role, annual_budget, base_hours_per_week,
+    etc.) are taken from the v1 assumptions when a `base_assumptions` is
+    supplied; they're identical between models since only the SDLC dimension
+    differs. When no base is supplied, safe defaults are used — useful for
+    tests and local sanity checks.
+
+    Args:
+        base_assumptions: Optional v1 RMAssumptions to copy non-phase fields
+            from. Used in the request path so supply_by_role reflects the
+            live roster data. If None, placeholder defaults are used.
+    """
+    from .models import (
+        DEFAULT_PHASE_WEIGHTS_V2,
+        DEFAULT_ROLE_PHASE_EFFORTS_V2,
+    )
+
+    phase_weights = dict(DEFAULT_PHASE_WEIGHTS_V2)
+    # Deep copy the role efforts so mutations don't leak back into the constants
+    role_phase_efforts = {
+        role_key: dict(effort_by_phase)
+        for role_key, effort_by_phase in DEFAULT_ROLE_PHASE_EFFORTS_V2.items()
+    }
+
+    # Compute per-role weighted average effort — same formula as
+    # SQLiteConnector.read_assumptions(): sum(phase_effort × phase_weight)
+    # across all phases.
+    role_avg_efforts = {}
+    for role_key, phases in role_phase_efforts.items():
+        avg = sum(
+            phases.get(p, 0.0) * phase_weights.get(p, 0.0)
+            for p in phase_weights
+        )
+        role_avg_efforts[role_key] = avg
+
+    if base_assumptions is not None:
+        return RMAssumptions(
+            base_hours_per_week=base_assumptions.base_hours_per_week,
+            admin_pct=base_assumptions.admin_pct,
+            breakfix_pct=base_assumptions.breakfix_pct,
+            project_pct=base_assumptions.project_pct,
+            available_project_hrs=base_assumptions.available_project_hrs,
+            max_projects_per_person=base_assumptions.max_projects_per_person,
+            sdlc_phase_weights=phase_weights,
+            role_phase_efforts=role_phase_efforts,
+            role_avg_efforts=role_avg_efforts,
+            supply_by_role=base_assumptions.supply_by_role,
+            annual_budget=base_assumptions.annual_budget,
+        )
+
+    # Placeholder defaults (for tests / dev without a DB)
+    return RMAssumptions(
+        base_hours_per_week=40.0,
+        admin_pct=0.10,
+        breakfix_pct=0.20,
+        project_pct=0.70,
+        available_project_hrs=28.0,
+        max_projects_per_person=3,
+        sdlc_phase_weights=phase_weights,
+        role_phase_efforts=role_phase_efforts,
+        role_avg_efforts=role_avg_efforts,
+        supply_by_role={},
+        annual_budget=0.0,
+    )
 
 
 if __name__ == "__main__":

@@ -6,6 +6,8 @@ import { TeamRoster } from "@/pages/TeamRoster";
 import { Planning } from "@/pages/Planning";
 import { Settings } from "@/pages/Settings";
 import { Wireframes } from "@/pages/Wireframes";
+import { CapacityV2 } from "@/pages/CapacityV2";
+import { PortfolioV2 } from "@/pages/PortfolioV2";
 
 export const router = createBrowserRouter([
   {
@@ -19,6 +21,9 @@ export const router = createBrowserRouter([
       { path: "settings", element: <Settings /> },
       // Hidden — not in Sidebar. Reachable only via direct URL.
       { path: "wireframes", element: <Wireframes /> },
+      // Simplified SDLC (v2) — parallel 3-phase capacity view.
+      { path: "v2/capacity", element: <CapacityV2 /> },
+      { path: "v2/portfolio", element: <PortfolioV2 /> },
     ],
   },
 ]);

@@ -2,7 +2,7 @@
 
 from typing import Iterator
 
-from fastapi import Depends
+from fastapi import Depends, Query
 
 from .config import settings
 
@@ -14,7 +14,7 @@ _ENGINES_DIR = Path(__file__).resolve().parents[1]
 if str(_ENGINES_DIR) not in sys.path:
     sys.path.insert(0, str(_ENGINES_DIR))
 
-from engines import SQLiteConnector, CapacityEngine, ScheduleOptimizer
+from engines import SQLiteConnector, CapacityEngine, ScheduleOptimizer, build_v2_assumptions
 
 
 def get_connector() -> Iterator[SQLiteConnector]:
@@ -25,7 +25,26 @@ def get_connector() -> Iterator[SQLiteConnector]:
         conn.close()
 
 
-def get_capacity(conn: SQLiteConnector = Depends(get_connector)) -> CapacityEngine:
+def get_capacity(
+    phase_model: str = Query("v1", pattern="^(v1|v2)$"),
+    conn: SQLiteConnector = Depends(get_connector),
+) -> CapacityEngine:
+    """Capacity engine dependency.
+
+    Accepts an optional `?phase_model=v2` query parameter. When `v2`,
+    the engine is constructed with a Simplified SDLC (3-phase) assumptions
+    override. The v1 default (6-phase) path is unchanged — no query
+    parameter, no override, same behavior as before.
+
+    The v2 assumptions inherit supply_by_role and other non-phase fields
+    from the live v1 assumptions (loaded from the database), so v2
+    calculations still reflect the real roster. Only phase weights and
+    role-phase efforts differ between the two models.
+    """
+    if phase_model == "v2":
+        base_assumptions = conn.read_assumptions()
+        override = build_v2_assumptions(base_assumptions=base_assumptions)
+        return CapacityEngine(connector=conn, assumptions_override=override)
     return CapacityEngine(connector=conn)
 
 

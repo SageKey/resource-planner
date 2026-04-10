@@ -12,6 +12,37 @@ from typing import Optional
 # ---------------------------------------------------------------------------
 SDLC_PHASES = ["discovery", "planning", "design", "build", "test", "deploy"]
 
+# v2 "Simplified SDLC" model — used by the /v2/capacity page. Fewer, bigger
+# phases → chunkier per-week demand numbers that map better to executive
+# mental models. Keys must be ordered Planning → Execution → Testing/Go Live
+# because the phase-boundary math in capacity_engine.py walks phases in order.
+SDLC_PHASES_V2 = ["planning", "execution", "testing_go_live"]
+
+# v2 phase weights — fraction of project duration spent in each phase.
+# Locked at 20/60/20 per Brett.
+DEFAULT_PHASE_WEIGHTS_V2 = {
+    "planning": 0.20,
+    "execution": 0.60,
+    "testing_go_live": 0.20,
+}
+
+# v2 role-phase efforts — for each role, fraction of their total project
+# hours spent in each phase. Each row sums to 1.00. Concentrated around
+# realistic peaks so peak-phase weekly numbers read chunky: BA heavy in
+# Planning, Developer heavy in Execution, Infrastructure heavy in
+# Testing/Go Live.
+DEFAULT_ROLE_PHASE_EFFORTS_V2 = {
+    "pm":             {"planning": 0.30, "execution": 0.50, "testing_go_live": 0.20},
+    "ba":             {"planning": 0.65, "execution": 0.25, "testing_go_live": 0.10},
+    "functional":     {"planning": 0.60, "execution": 0.30, "testing_go_live": 0.10},
+    "technical":      {"planning": 0.40, "execution": 0.50, "testing_go_live": 0.10},
+    "developer":      {"planning": 0.05, "execution": 0.80, "testing_go_live": 0.15},
+    "infrastructure": {"planning": 0.10, "execution": 0.30, "testing_go_live": 0.60},
+    "dba":            {"planning": 0.10, "execution": 0.60, "testing_go_live": 0.30},
+    "erp":            {"planning": 0.15, "execution": 0.30, "testing_go_live": 0.55},
+    "wms":            {"planning": 0.15, "execution": 0.30, "testing_go_live": 0.55},
+}
+
 # ---------------------------------------------------------------------------
 # Role Mappings
 # ---------------------------------------------------------------------------
