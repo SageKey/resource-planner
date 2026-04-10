@@ -1,7 +1,9 @@
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Users } from "lucide-react";
+import { Briefcase, Clock, Users, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { useAssignmentMatrix, type MatrixData } from "@/hooks/useAssignments";
 import type { PersonHeatmapResponse, PersonHeatmapRow } from "@/hooks/useCapacity";
 
 /**
@@ -13,10 +15,14 @@ import type { PersonHeatmapResponse, PersonHeatmapRow } from "@/hooks/useCapacit
  *   - Free hours this week (hero)
  *   - Allocated % (hero)
  *   - Usage bar with status color
- *   - Next 4 weeks mini-strip
+ *   - Next 4 weeks mini-chart
+ *
+ * Click a card to open a detail modal showing the person's current-week
+ * and 26-week average load along with every project they're assigned to.
  *
  * Data source: the same PersonHeatmapResponse that feeds PersonHeatmapGrid,
- * so the numbers on the cards match the heatmap cells exactly.
+ * so the numbers on the cards match the heatmap cells exactly. The project
+ * list in the modal comes from the assignment matrix.
  */
 
 interface Props {
@@ -86,6 +92,9 @@ function initials(name: string): string {
 }
 
 export function TeamAllocationCards({ data }: Props) {
+  const matrix = useAssignmentMatrix();
+  const [selectedPerson, setSelectedPerson] = useState<PersonHeatmapRow | null>(null);
+
   if (!data) return null;
   const people = data.people.filter((p) => p.include_in_capacity);
   if (people.length === 0) {
@@ -105,7 +114,7 @@ export function TeamAllocationCards({ data }: Props) {
           <div className="font-semibold text-slate-800">Per-person weekly allocation</div>
           <p>
             One card per roster member. Shows current-week allocation vs
-            personal capacity. Next 4 weeks strip gives a forward glance.
+            personal capacity. Click a card to see their full project list.
           </p>
           <p className="font-mono text-[10px] bg-slate-100 rounded px-2 py-1 mt-1">
             Free = capacity_hrs_week × (1 − utilization_this_week)
@@ -118,14 +127,36 @@ export function TeamAllocationCards({ data }: Props) {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {people.map((person, i) => (
-          <PersonCard key={person.name} person={person} index={i} />
+          <PersonCard
+            key={person.name}
+            person={person}
+            index={i}
+            onClick={() => setSelectedPerson(person)}
+          />
         ))}
       </div>
+
+      {/* Detail modal */}
+      {selectedPerson && (
+        <PersonDetailModal
+          person={selectedPerson}
+          matrix={matrix.data}
+          onClose={() => setSelectedPerson(null)}
+        />
+      )}
     </div>
   );
 }
 
-function PersonCard({ person, index }: { person: PersonHeatmapRow; index: number }) {
+function PersonCard({
+  person,
+  index,
+  onClick,
+}: {
+  person: PersonHeatmapRow;
+  index: number;
+  onClick: () => void;
+}) {
   const pctNow = person.cells[0] ?? 0;
   const capacity = person.capacity_hrs_week;
   const allocatedHrs = Math.round(pctNow * capacity * 10) / 10;
@@ -133,25 +164,21 @@ function PersonCard({ person, index }: { person: PersonHeatmapRow; index: number
   const status = capacity > 0 ? statusFromPct(pctNow) : "unknown";
   const style = STATUS_STYLE[status];
 
-  // Bar fill width — cap at 100% for visual purposes but show real % in text
   const barWidth = Math.min(100, pctNow * 100);
 
-  // Next 4 weeks preview (indices 1..4)
-  const nextWeeks = [1, 2, 3, 4].map((idx) => {
-    const pct = person.cells[idx] ?? 0;
-    return {
-      idx,
-      pct,
-      status: statusFromPct(pct),
-    };
-  });
+  const nextWeeks = [1, 2, 3, 4].map((idx) => ({
+    idx,
+    pct: person.cells[idx] ?? 0,
+    status: statusFromPct(person.cells[idx] ?? 0),
+  }));
 
   return (
-    <motion.div
+    <motion.button
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.04, ease: "easeOut" }}
-      className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+      onClick={onClick}
+      className="block w-full rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
     >
       {/* Header */}
       <div className="flex items-start gap-3">
@@ -225,7 +252,7 @@ function PersonCard({ person, index }: { person: PersonHeatmapRow; index: number
         </div>
         <NextWeeksChart weeks={nextWeeks} rowIndex={index} />
       </div>
-    </motion.div>
+    </motion.button>
   );
 }
 
@@ -240,23 +267,17 @@ interface NextWeekCell {
 }
 
 function NextWeeksChart({ weeks, rowIndex }: { weeks: NextWeekCell[]; rowIndex: number }) {
-  // Visual scale: cap at 125% for bar height so over-capacity weeks read
-  // distinctly without blowing the layout. The 100% reference line sits
-  // at 80% of the chart height.
   const MAX_PCT = 1.25;
-  const CHART_HEIGHT = 56; // px
-  const referenceLinePct = 1.0 / MAX_PCT; // where the 100% line sits (0..1)
+  const CHART_HEIGHT = 56;
+  const referenceLinePct = 1.0 / MAX_PCT;
 
   return (
     <div className="relative rounded-lg border border-slate-100 bg-slate-50/60 p-2">
-      {/* Chart area with reference line */}
       <div className="relative" style={{ height: `${CHART_HEIGHT}px` }}>
-        {/* 100% reference line */}
         <div
           className="pointer-events-none absolute left-0 right-0 border-t border-dashed border-slate-300"
           style={{ bottom: `${referenceLinePct * 100}%` }}
         />
-        {/* Bars */}
         <div className="absolute inset-0 flex items-end justify-around gap-1.5">
           {weeks.map((wk) => {
             const style = STATUS_STYLE[wk.status];
@@ -288,7 +309,6 @@ function NextWeeksChart({ weeks, rowIndex }: { weeks: NextWeekCell[]; rowIndex: 
         </div>
       </div>
 
-      {/* Percent labels */}
       <div className="mt-1 flex items-center justify-around gap-1.5">
         {weeks.map((wk) => {
           const style = STATUS_STYLE[wk.status];
@@ -306,7 +326,6 @@ function NextWeeksChart({ weeks, rowIndex }: { weeks: NextWeekCell[]; rowIndex: 
         })}
       </div>
 
-      {/* Week labels */}
       <div className="mt-0.5 flex items-center justify-around gap-1.5">
         {weeks.map((wk) => (
           <div
@@ -320,3 +339,265 @@ function NextWeeksChart({ weeks, rowIndex }: { weeks: NextWeekCell[]; rowIndex: 
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Person detail modal
+// ---------------------------------------------------------------------------
+
+interface PersonAssignedProject {
+  id: string;
+  name: string;
+  health: string | null;
+  priority: string | null;
+  est_hours: number;
+  role_key: string;
+  allocation_pct: number; // 0..1, the person's share of the role on this project
+}
+
+function PersonDetailModal({
+  person,
+  matrix,
+  onClose,
+}: {
+  person: PersonHeatmapRow;
+  matrix: MatrixData | undefined;
+  onClose: () => void;
+}) {
+  const pctNow = person.cells[0] ?? 0;
+  const capacity = person.capacity_hrs_week;
+  const allocatedHrs = Math.round(pctNow * capacity * 10) / 10;
+  const freeHrs = Math.max(0, Math.round((capacity - allocatedHrs) * 10) / 10);
+  const status = capacity > 0 ? statusFromPct(pctNow) : "unknown";
+  const style = STATUS_STYLE[status];
+
+  // 26-week average utilization (cells average)
+  const avgPct = useMemo(() => {
+    if (person.cells.length === 0) return 0;
+    const sum = person.cells.reduce((a, b) => a + b, 0);
+    return sum / person.cells.length;
+  }, [person.cells]);
+
+  const avgStatus = statusFromPct(avgPct);
+  const avgStyle = STATUS_STYLE[avgStatus];
+
+  // Build the project list from the assignment matrix
+  const assignedProjects: PersonAssignedProject[] = useMemo(() => {
+    if (!matrix) return [];
+    const projectsById: Record<string, MatrixData["projects"][number]> = {};
+    for (const p of matrix.projects) {
+      projectsById[p.id] = p;
+    }
+
+    const out: PersonAssignedProject[] = [];
+    for (const [projectId, personMap] of Object.entries(matrix.assignments)) {
+      const entry = personMap[person.name];
+      if (!entry) continue;
+      const proj = projectsById[projectId];
+      if (!proj) continue;
+      out.push({
+        id: proj.id,
+        name: proj.name,
+        health: proj.health,
+        priority: proj.priority,
+        est_hours: proj.est_hours,
+        role_key: entry.role_key,
+        allocation_pct: entry.allocation_pct,
+      });
+    }
+    // Sort by allocation_pct descending (biggest commitments first)
+    out.sort((a, b) => b.allocation_pct - a.allocation_pct);
+    return out;
+  }, [matrix, person.name]);
+
+  const barWidth = Math.min(100, pctNow * 100);
+  const avgBarWidth = Math.min(100, avgPct * 100);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl bg-white shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
+              {initials(person.name)}
+            </div>
+            <div>
+              <div className="text-base font-semibold text-slate-900">{person.name}</div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                <span>{person.role}</span>
+                <span>·</span>
+                <span className="tabular-nums">{capacity.toFixed(0)}h/wk capacity</span>
+                {person.team && (
+                  <>
+                    <span>·</span>
+                    <span>{person.team}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* This Week + Total hero row */}
+        <div className="grid grid-cols-2 gap-4 border-b border-slate-100 p-6">
+          {/* This Week */}
+          <div className="rounded-lg border border-slate-200 p-4">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              This Week
+            </div>
+            <div className="mt-2 flex items-end justify-between gap-2">
+              <div>
+                <div className={cn("text-3xl font-bold tabular-nums", style.text)}>
+                  {Math.round(pctNow * 100)}
+                  <span className="ml-0.5 text-base font-semibold text-slate-400">%</span>
+                </div>
+                <div className="mt-0.5 text-[11px] tabular-nums text-slate-500">
+                  {allocatedHrs}h of {capacity.toFixed(0)}h · {freeHrs}h free
+                </div>
+              </div>
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  style.pillBg,
+                  style.pillText,
+                )}
+              >
+                {style.label}
+              </span>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={cn("h-full rounded-full", style.bar)}
+                style={{ width: `${barWidth}%` }}
+              />
+            </div>
+          </div>
+
+          {/* 26-Week Average (Total) */}
+          <div className="rounded-lg border border-slate-200 p-4">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Total — Avg 26 Weeks
+            </div>
+            <div className="mt-2 flex items-end justify-between gap-2">
+              <div>
+                <div className={cn("text-3xl font-bold tabular-nums", avgStyle.text)}>
+                  {Math.round(avgPct * 100)}
+                  <span className="ml-0.5 text-base font-semibold text-slate-400">%</span>
+                </div>
+                <div className="mt-0.5 text-[11px] tabular-nums text-slate-500">
+                  Project-average load across the visible horizon
+                </div>
+              </div>
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  avgStyle.pillBg,
+                  avgStyle.pillText,
+                )}
+              >
+                {avgStyle.label}
+              </span>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={cn("h-full rounded-full", avgStyle.bar)}
+                style={{ width: `${avgBarWidth}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Projects assigned */}
+        <div className="p-6">
+          <div className="mb-3 flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-slate-500" />
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+              Assigned Projects
+            </div>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+              {assignedProjects.length}
+            </span>
+          </div>
+          {assignedProjects.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-xs text-slate-400">
+              No project assignments.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {assignedProjects.map((p) => (
+                <AssignedProjectRow key={`${p.id}-${p.role_key}`} project={p} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AssignedProjectRow({ project }: { project: PersonAssignedProject }) {
+  const allocPct = Math.round(project.allocation_pct * 100);
+  const healthLabel = project.health ? project.health.replace(/^[^\w]*/, "").trim() : "Unknown";
+  const roleLabel = ROLE_SHORT[project.role_key] ?? project.role_key;
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] text-slate-400">{project.id}</span>
+          <span className="truncate text-sm font-medium text-slate-800">{project.name}</span>
+        </div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500">
+          <span className="inline-flex items-center gap-1">
+            <Clock className="h-2.5 w-2.5" />
+            <span className="tabular-nums">{project.est_hours.toLocaleString()}h total</span>
+          </span>
+          {project.priority && (
+            <>
+              <span>·</span>
+              <span>{project.priority} priority</span>
+            </>
+          )}
+          {project.health && (
+            <>
+              <span>·</span>
+              <span>{healthLabel}</span>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          {roleLabel}
+        </div>
+        <div className="text-sm font-bold tabular-nums text-slate-700">{allocPct}%</div>
+      </div>
+    </div>
+  );
+}
+
+const ROLE_SHORT: Record<string, string> = {
+  pm: "PM",
+  ba: "BA",
+  functional: "Functional",
+  technical: "Technical",
+  developer: "Developer",
+  infrastructure: "Infrastructure",
+  dba: "DBA",
+  erp: "ERP",
+  "wms consultant": "WMS",
+  wms: "WMS",
+};
