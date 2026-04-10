@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
   PROJECTS,
@@ -29,7 +30,7 @@ interface MonthCell {
 
 const PRIORITY_STYLE: Record<
   Priority,
-  { bg: string; fill: string; text: string; legend: string; label: string }
+  { bg: string; fill: string; text: string; legend: string; label: string; border: string; textOnWhite: string }
 > = {
   Highest: {
     bg: "bg-rose-200",
@@ -37,6 +38,8 @@ const PRIORITY_STYLE: Record<
     text: "text-white",
     legend: "bg-rose-500",
     label: "Highest",
+    border: "border-rose-500",
+    textOnWhite: "text-rose-600",
   },
   High: {
     bg: "bg-amber-200",
@@ -44,6 +47,8 @@ const PRIORITY_STYLE: Record<
     text: "text-white",
     legend: "bg-amber-500",
     label: "High",
+    border: "border-amber-500",
+    textOnWhite: "text-amber-600",
   },
   Medium: {
     bg: "bg-sky-200",
@@ -51,6 +56,8 @@ const PRIORITY_STYLE: Record<
     text: "text-white",
     legend: "bg-sky-500",
     label: "Medium",
+    border: "border-sky-500",
+    textOnWhite: "text-sky-600",
   },
   Low: {
     bg: "bg-slate-300",
@@ -58,6 +65,8 @@ const PRIORITY_STYLE: Record<
     text: "text-white",
     legend: "bg-slate-600",
     label: "Low",
+    border: "border-slate-600",
+    textOnWhite: "text-slate-700",
   },
 };
 
@@ -82,10 +91,24 @@ function fmtDate(iso: string): string {
 
 export function ProjectGanttConcept() {
   const [selected, setSelected] = useState<MockProject | null>(null);
+  const [showProposed, setShowProposed] = useState(false);
+
+  // Projects visible in the Gantt: always show non-plannable (in-flight)
+  // projects; only include plannable ones when the toggle is on. Blocked
+  // plannable projects (no proposedStart) never render as bars — they have
+  // no viable window to draw.
+  const visibleProjects = useMemo(() => {
+    return PROJECTS.filter((p) => {
+      if (!p.isPlannable) return true;
+      if (!showProposed) return false;
+      return p.proposedStart !== null;
+    });
+  }, [showProposed]);
 
   const { rangeStart, rangeEnd, months, todayPct } = useMemo(() => {
-    const allStarts = PROJECTS.map((p) => new Date(p.startDate).getTime());
-    const allEnds = PROJECTS.map((p) => new Date(p.endDate).getTime());
+    const source = PROJECTS; // Range always spans full possible window
+    const allStarts = source.map((p) => new Date(p.startDate).getTime());
+    const allEnds = source.map((p) => new Date(p.endDate).getTime());
     const earliest = new Date(Math.min(...allStarts));
     const latest = new Date(Math.max(...allEnds));
 
@@ -120,12 +143,12 @@ export function ProjectGanttConcept() {
 
   // Sort by priority then by start date
   const sortedProjects = useMemo(() => {
-    return [...PROJECTS].sort((a, b) => {
+    return [...visibleProjects].sort((a, b) => {
       const priDiff = PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority);
       if (priDiff !== 0) return priDiff;
       return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     });
-  }, []);
+  }, [visibleProjects]);
 
   const rangeLabel = `${fmtMonth(rangeStart)} → ${fmtMonth(rangeEnd)}`;
 
@@ -133,26 +156,43 @@ export function ProjectGanttConcept() {
     <>
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         {/* Header */}
-        <div className="mb-5 flex items-start justify-between">
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
               Project Gantt
             </div>
             <div className="mt-0.5 text-xs text-slate-500">
-              {PROJECTS.length} scheduled projects · {rangeLabel}
+              {visibleProjects.length} {showProposed ? "projects (live + proposed)" : "in-flight projects"} · {rangeLabel}
             </div>
           </div>
-          {/* Priority legend */}
           <div className="flex items-center gap-4">
-            {PRIORITY_ORDER.map((p) => {
-              const s = PRIORITY_STYLE[p];
-              return (
-                <div key={p} className="flex items-center gap-1.5">
-                  <span className={cn("h-2.5 w-4 rounded-sm", s.legend)} />
-                  <span className="text-[11px] font-medium text-slate-700">{s.label}</span>
-                </div>
-              );
-            })}
+            {/* Priority legend */}
+            <div className="flex items-center gap-4">
+              {PRIORITY_ORDER.map((p) => {
+                const s = PRIORITY_STYLE[p];
+                return (
+                  <div key={p} className="flex items-center gap-1.5">
+                    <span className={cn("h-2.5 w-4 rounded-sm", s.legend)} />
+                    <span className="text-[11px] font-medium text-slate-700">{s.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Divider */}
+            <div className="h-5 w-px bg-slate-200" />
+            {/* Show Proposed toggle */}
+            <button
+              onClick={() => setShowProposed((v) => !v)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors",
+                showProposed
+                  ? "bg-navy-600 text-white shadow-sm hover:bg-navy-700"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+              )}
+            >
+              {showProposed ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              Show proposed
+            </button>
           </div>
         </div>
 
@@ -228,6 +268,7 @@ export function ProjectGanttConcept() {
                   style={{ left: `${todayPct}%`, height: "100%" }}
                 />
                 {sortedProjects.map((p, rowIdx) => {
+                  const isProposed = p.isPlannable;
                   const pStart = new Date(p.startDate).getTime();
                   const pEnd = new Date(p.endDate).getTime();
                   const leftPct = Math.max(0, ((pStart - rangeStart.getTime()) / totalMs) * 100);
@@ -264,40 +305,58 @@ export function ProjectGanttConcept() {
                         }}
                         onClick={() => setSelected(p)}
                         className={cn(
-                          "absolute top-1/2 h-7 -translate-y-1/2 cursor-pointer overflow-hidden rounded-md shadow-sm transition-all hover:brightness-105 hover:shadow",
-                          style.bg,
+                          "absolute top-1/2 h-7 -translate-y-1/2 cursor-pointer overflow-hidden rounded-md transition-all",
+                          isProposed
+                            ? cn("border-2 border-dashed bg-white hover:bg-slate-50", style.border)
+                            : cn(style.bg, "shadow-sm hover:brightness-105 hover:shadow"),
                         )}
                         style={{
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
                         }}
                       >
-                        {/* Progress fill — left-aligned, width = progressPct of bar */}
-                        {p.pctComplete > 0 && (
-                          <div
-                            className={cn(
-                              "flex h-full items-center justify-end overflow-hidden px-2",
-                              style.fill,
-                            )}
-                            style={{ width: `${progressPct}%` }}
-                          >
+                        {isProposed ? (
+                          /* PROPOSED label, centered */
+                          <div className="flex h-full items-center justify-center px-2">
                             <span
                               className={cn(
-                                "whitespace-nowrap text-[10px] font-bold tabular-nums",
-                                style.text,
+                                "whitespace-nowrap text-[9px] font-bold uppercase tracking-wider",
+                                style.textOnWhite,
                               )}
                             >
-                              {Math.round(progressPct)}%
+                              Proposed
                             </span>
                           </div>
-                        )}
-                        {/* Zero-progress label — inside bg bar, left-aligned */}
-                        {p.pctComplete === 0 && (
-                          <div className="flex h-full items-center px-2">
-                            <span className="whitespace-nowrap text-[10px] font-semibold text-slate-600">
-                              0%
-                            </span>
-                          </div>
+                        ) : (
+                          <>
+                            {/* Progress fill — left-aligned, width = progressPct of bar */}
+                            {p.pctComplete > 0 && (
+                              <div
+                                className={cn(
+                                  "flex h-full items-center justify-end overflow-hidden px-2",
+                                  style.fill,
+                                )}
+                                style={{ width: `${progressPct}%` }}
+                              >
+                                <span
+                                  className={cn(
+                                    "whitespace-nowrap text-[10px] font-bold tabular-nums",
+                                    style.text,
+                                  )}
+                                >
+                                  {Math.round(progressPct)}%
+                                </span>
+                              </div>
+                            )}
+                            {/* Zero-progress label — inside bg bar, left-aligned */}
+                            {p.pctComplete === 0 && (
+                              <div className="flex h-full items-center px-2">
+                                <span className="whitespace-nowrap text-[10px] font-semibold text-slate-600">
+                                  0%
+                                </span>
+                              </div>
+                            )}
+                          </>
                         )}
                       </motion.button>
                     </div>

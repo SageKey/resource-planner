@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { AlertTriangle, LayoutGrid, GanttChartSquare, Columns3 } from "lucide-react";
+import { AlertTriangle, LayoutGrid, GanttChartSquare, Columns3, CalendarClock } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { RoleCardsConcept } from "@/components/wireframes/RoleCardsConcept";
 import { ProjectGanttConcept } from "@/components/wireframes/ProjectGanttConcept";
 import { PhaseKanbanConcept } from "@/components/wireframes/PhaseKanbanConcept";
+import { StartQueueConcept } from "@/components/wireframes/StartQueueConcept";
 import { cn } from "@/lib/cn";
 
-type TabKey = "cards" | "gantt" | "kanban";
+type TabKey = "cards" | "gantt" | "kanban" | "queue";
 
 const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }>; description: string }[] = [
   {
@@ -26,6 +27,12 @@ const TABS: { key: TabKey; label: string; icon: React.ComponentType<{ className?
     label: "Phase Kanban",
     icon: Columns3,
     description: "Three columns — Planning, Build, Test/Deploy. Projects flow left to right.",
+  },
+  {
+    key: "queue",
+    label: "Start Queue",
+    icon: CalendarClock,
+    description: "Plannable projects sorted by earliest viable start date, with role bottlenecks.",
   },
 ];
 
@@ -82,6 +89,7 @@ export function Wireframes() {
           {tab === "cards" && <RoleCardsConcept />}
           {tab === "gantt" && <ProjectGanttConcept />}
           {tab === "kanban" && <PhaseKanbanConcept />}
+          {tab === "queue" && <StartQueueConcept />}
         </div>
 
         {/* Footer note */}

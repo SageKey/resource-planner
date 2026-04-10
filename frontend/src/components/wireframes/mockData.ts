@@ -51,6 +51,19 @@ export interface PhaseState {
   endWeek: number | null;
 }
 
+export interface BottleneckInfo {
+  roleKey: RoleKey;
+  freeHrs: number;
+  neededHrs: number;
+  clearDate: string | null; // null = never clears within visible horizon
+}
+
+export interface ProposedPhases {
+  planning: string | null; // YYYY-MM-DD, null if blocked
+  build: string | null;
+  test_deploy: string | null;
+}
+
 export interface MockProject {
   id: string;
   name: string;
@@ -71,6 +84,14 @@ export interface MockProject {
   planning: PhaseState;
   build: PhaseState;
   test_deploy: PhaseState;
+  // Start Queue fields — populated ONLY for plannable (not-yet-started)
+  // projects. Represent what a real scheduler would compute, hardcoded
+  // here for the wireframe.
+  proposedStart: string | null; // YYYY-MM-DD, null = blocked indefinitely
+  proposedPhases: ProposedPhases | null;
+  bottleneck: BottleneckInfo | null; // null = team has room, no blocker
+  // Whether this project should appear in the Start Queue view
+  isPlannable: boolean;
 }
 
 // Palette — each project gets a stable entry
@@ -135,6 +156,11 @@ interface ProjectInit {
   planning: PhaseState;
   build: PhaseState;
   test_deploy: PhaseState;
+  // Optional Start Queue fields — only set for plannable projects
+  isPlannable?: boolean;
+  proposedStart?: string | null;
+  proposedPhases?: ProposedPhases | null;
+  bottleneck?: BottleneckInfo | null;
 }
 
 function project(o: ProjectInit): MockProject {
@@ -156,6 +182,10 @@ function project(o: ProjectInit): MockProject {
     planning: o.planning,
     build: o.build,
     test_deploy: o.test_deploy,
+    isPlannable: o.isPlannable ?? false,
+    proposedStart: o.proposedStart ?? null,
+    proposedPhases: o.proposedPhases ?? null,
+    bottleneck: o.bottleneck ?? null,
   };
 }
 
@@ -208,6 +238,9 @@ export const PROJECTS: MockProject[] = [
     build: { hoursByRole: { pm: 10, developer: 90, technical: 15 }, progress: 0, startWeek: 2, endWeek: 6 },
     test_deploy: { hoursByRole: { pm: 5, developer: 15, infrastructure: 5 }, progress: 0, startWeek: 6, endWeek: 7 },
   }),
+  // PLANNABLE — Waiting on Developer. Catalog API Rust2Python and Standard
+  // Order Notifications consume the dev pool heavily through mid-May.
+  // Earliest meaningful slot for a 1,600h dev-heavy project is 06/01.
   project({
     id: "ETE-7",
     name: "Outsourced Unit Core Accounting",
@@ -215,13 +248,17 @@ export const PROJECTS: MockProject[] = [
     tshirt: "XL",
     totalHours: 1600,
     currentPhase: "not_started",
-    priority: "High",
+    priority: "Highest",
     startDate: "2026-06-01",
     endDate: "2026-12-15",
     pctComplete: 0,
     planning: { hoursByRole: { pm: 80, ba: 120, functional: 60 }, progress: 0, startWeek: 4, endWeek: 8 },
     build: { hoursByRole: { pm: 40, developer: 500, technical: 200 }, progress: 0, startWeek: 8, endWeek: 11 },
     test_deploy: { hoursByRole: { pm: 20, developer: 60, infrastructure: 40 }, progress: 0, startWeek: 11, endWeek: 12 },
+    isPlannable: true,
+    proposedStart: "2026-06-01",
+    proposedPhases: { planning: "2026-06-01", build: "2026-07-15", test_deploy: "2026-10-20" },
+    bottleneck: { roleKey: "developer", freeHrs: 12, neededHrs: 45, clearDate: "2026-06-01" },
   }),
   project({
     id: "ETE-37",
@@ -267,6 +304,99 @@ export const PROJECTS: MockProject[] = [
     planning: { hoursByRole: {}, progress: 1, startWeek: 0, endWeek: 0 }, // small: skipped planning
     build: { hoursByRole: { developer: 55, technical: 10 }, progress: 0.35, startWeek: 0, endWeek: 3 },
     test_deploy: { hoursByRole: { developer: 10, ba: 5 }, progress: 0, startWeek: 3, endWeek: 4 },
+  }),
+
+  // PLANNABLE — Small work, team has room right now. Can begin next Monday
+  // (04/14). No meaningful bottleneck because it only needs ~15h of dev time
+  // total, which fits in available dev slack this week.
+  project({
+    id: "ETE-201",
+    name: "Inventory Audit Dashboard",
+    paletteKey: "teal",
+    tshirt: "S",
+    totalHours: 80,
+    currentPhase: "not_started",
+    priority: "Medium",
+    startDate: "2026-04-14",
+    endDate: "2026-05-12",
+    pctComplete: 0,
+    planning: { hoursByRole: { ba: 10, pm: 5 }, progress: 0, startWeek: 0, endWeek: 1 },
+    build: { hoursByRole: { developer: 40, technical: 10 }, progress: 0, startWeek: 1, endWeek: 3 },
+    test_deploy: { hoursByRole: { developer: 10, ba: 5 }, progress: 0, startWeek: 3, endWeek: 4 },
+    isPlannable: true,
+    proposedStart: "2026-04-14",
+    proposedPhases: { planning: "2026-04-14", build: "2026-04-21", test_deploy: "2026-05-05" },
+    bottleneck: null, // team has room
+  }),
+
+  // PLANNABLE — BA is the constraint. Purview planning + Standard Order
+  // Notifications consume BA pool through ~04/27. Project can launch as soon
+  // as BA capacity opens back up (04/28).
+  project({
+    id: "ETE-215",
+    name: "Commissions Automation",
+    paletteKey: "violet",
+    tshirt: "M",
+    totalHours: 240,
+    currentPhase: "not_started",
+    priority: "High",
+    startDate: "2026-04-28",
+    endDate: "2026-07-15",
+    pctComplete: 0,
+    planning: { hoursByRole: { pm: 20, ba: 45, functional: 15 }, progress: 0, startWeek: 0, endWeek: 3 },
+    build: { hoursByRole: { developer: 110, technical: 25 }, progress: 0, startWeek: 3, endWeek: 9 },
+    test_deploy: { hoursByRole: { developer: 15, ba: 10, pm: 5 }, progress: 0, startWeek: 9, endWeek: 11 },
+    isPlannable: true,
+    proposedStart: "2026-04-28",
+    proposedPhases: { planning: "2026-04-28", build: "2026-05-20", test_deploy: "2026-06-24" },
+    bottleneck: { roleKey: "ba", freeHrs: 20, neededHrs: 45, clearDate: "2026-04-28" },
+  }),
+
+  // PLANNABLE — Functional team fully committed (2 people, Purview +
+  // Commissions pull both of them in). Next viable window is mid-July when
+  // Purview's planning phase wraps.
+  project({
+    id: "ETE-228",
+    name: "Vendor Portal V2",
+    paletteKey: "sky",
+    tshirt: "L",
+    totalHours: 640,
+    currentPhase: "not_started",
+    priority: "High",
+    startDate: "2026-07-15",
+    endDate: "2026-12-20",
+    pctComplete: 0,
+    planning: { hoursByRole: { pm: 40, ba: 60, functional: 60 }, progress: 0, startWeek: 0, endWeek: 4 },
+    build: { hoursByRole: { pm: 20, developer: 280, technical: 80 }, progress: 0, startWeek: 4, endWeek: 10 },
+    test_deploy: { hoursByRole: { developer: 60, infrastructure: 30, ba: 10 }, progress: 0, startWeek: 10, endWeek: 12 },
+    isPlannable: true,
+    proposedStart: "2026-07-15",
+    proposedPhases: { planning: "2026-07-15", build: "2026-08-20", test_deploy: "2026-11-15" },
+    bottleneck: { roleKey: "functional", freeHrs: 8, neededHrs: 60, clearDate: "2026-07-15" },
+  }),
+
+  // PLANNABLE — BLOCKED. Developer capacity is fully committed through end
+  // of visible horizon by Catalog API, Standard Orders, Outsourced Unit,
+  // Vendor Portal, and Purview build. No clear date — needs a priority
+  // reshuffle or new headcount.
+  project({
+    id: "ETE-240",
+    name: "Legacy Payments Retirement",
+    paletteKey: "rose",
+    tshirt: "L",
+    totalHours: 480,
+    currentPhase: "not_started",
+    priority: "Medium",
+    startDate: "2026-09-01",
+    endDate: "2027-02-15",
+    pctComplete: 0,
+    planning: { hoursByRole: { pm: 30, ba: 50, functional: 20 }, progress: 0, startWeek: 0, endWeek: 4 },
+    build: { hoursByRole: { developer: 260, technical: 50 }, progress: 0, startWeek: 4, endWeek: 10 },
+    test_deploy: { hoursByRole: { developer: 40, infrastructure: 20, pm: 10 }, progress: 0, startWeek: 10, endWeek: 12 },
+    isPlannable: true,
+    proposedStart: null,
+    proposedPhases: null,
+    bottleneck: { roleKey: "developer", freeHrs: 0, neededHrs: 45, clearDate: null },
   }),
 ];
 
@@ -395,4 +525,90 @@ export function projectsInPhase(phase: PhaseKey): MockProject[] {
 
 export function projectsWaitingToStart(): MockProject[] {
   return PROJECTS.filter((p) => p.currentPhase === "not_started");
+}
+
+// -------------------------------------------------------------------------
+// Start Queue helpers
+// -------------------------------------------------------------------------
+
+const PRIORITY_RANK: Record<Priority, number> = {
+  Highest: 0,
+  High: 1,
+  Medium: 2,
+  Low: 3,
+};
+
+/**
+ * All plannable (not-yet-started) projects, sorted by priority then by
+ * earliest viable start date. Blocked projects (proposedStart=null)
+ * sort to the bottom of their priority group.
+ */
+export function plannableProjects(): MockProject[] {
+  return PROJECTS.filter((p) => p.isPlannable).sort((a, b) => {
+    const pri = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+    if (pri !== 0) return pri;
+    // Nulls last
+    if (a.proposedStart === null && b.proposedStart === null) return 0;
+    if (a.proposedStart === null) return 1;
+    if (b.proposedStart === null) return -1;
+    return new Date(a.proposedStart).getTime() - new Date(b.proposedStart).getTime();
+  });
+}
+
+export interface StartQueueStats {
+  thisMonth: number;
+  next60: number;
+  later: number;
+  blocked: number;
+}
+
+/**
+ * Bucket plannable projects by how soon they can begin, measured against
+ * MOCK_TODAY.
+ *   - thisMonth: start date on or before the last day of today's month
+ *   - next60:    starts within 60 days of today (but after this month)
+ *   - later:     starts beyond 60 days
+ *   - blocked:   no viable start date
+ */
+export function startQueueStats(): StartQueueStats {
+  const now = MOCK_TODAY.getTime();
+  const endOfMonth = new Date(
+    MOCK_TODAY.getFullYear(),
+    MOCK_TODAY.getMonth() + 1,
+    0,
+  ).getTime();
+  const sixtyDays = now + 60 * 24 * 60 * 60 * 1000;
+
+  const stats: StartQueueStats = { thisMonth: 0, next60: 0, later: 0, blocked: 0 };
+  for (const p of plannableProjects()) {
+    if (p.proposedStart === null) {
+      stats.blocked += 1;
+      continue;
+    }
+    const startMs = new Date(p.proposedStart + "T00:00:00").getTime();
+    if (startMs <= endOfMonth) {
+      stats.thisMonth += 1;
+    } else if (startMs <= sixtyDays) {
+      stats.next60 += 1;
+    } else {
+      stats.later += 1;
+    }
+  }
+  return stats;
+}
+
+/**
+ * Group plannable projects by priority, in rank order. Priorities with
+ * no projects are omitted.
+ */
+export function plannableByPriority(): { priority: Priority; projects: MockProject[] }[] {
+  const byPri = new Map<Priority, MockProject[]>();
+  for (const p of plannableProjects()) {
+    if (!byPri.has(p.priority)) byPri.set(p.priority, []);
+    byPri.get(p.priority)!.push(p);
+  }
+  const order: Priority[] = ["Highest", "High", "Medium", "Low"];
+  return order
+    .filter((pr) => byPri.has(pr))
+    .map((pr) => ({ priority: pr, projects: byPri.get(pr)! }));
 }
