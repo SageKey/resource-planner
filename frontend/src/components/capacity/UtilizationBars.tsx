@@ -46,9 +46,18 @@ interface Props {
   coverage?: Record<string, RoleCoverage> | null;
   /** assignments[project_id][person_name] = {role_key, allocation_pct} */
   assignments?: Record<string, Record<string, { role_key: string; allocation_pct: number }>> | null;
+  /** Optional override for the section title (defaults to "Role Utilization"). */
+  title?: string;
+  /** Optional small second-line text per role (role_key → subtext).
+   *  Rendered under the role name in the left column. Used by the v2 page to
+   *  show "Peak next 13w: X%" when hero numbers reflect current-week load. */
+  roleSubtext?: Record<string, string>;
+  /** Optional small note rendered right under the title, explaining what
+   *  the hero numbers represent in this view (e.g. "This week · peak below"). */
+  titleNote?: string;
 }
 
-export function UtilizationBars({ roles, coverage, assignments }: Props) {
+export function UtilizationBars({ roles, coverage, assignments, title, roleSubtext, titleNote }: Props) {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
 
   if (!roles) return null;
@@ -61,8 +70,8 @@ export function UtilizationBars({ roles, coverage, assignments }: Props) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6">
-      <h2 className="mb-4 text-sm font-semibold text-slate-700">
-        Role Utilization
+      <h2 className="mb-1 text-sm font-semibold text-slate-700">
+        {title ?? "Role Utilization"}
         <InfoTooltip>
           <div className="font-semibold text-slate-800">Role Utilization Formulas</div>
           <p className="font-mono text-[10px] bg-slate-100 rounded px-2 py-1">Util% = Total_Demand / Supply</p>
@@ -74,6 +83,10 @@ export function UtilizationBars({ roles, coverage, assignments }: Props) {
           <p className="text-slate-400 mt-1">Click any row for project breakdown. See Settings → Formulas for full detail.</p>
         </InfoTooltip>
       </h2>
+      {titleNote && (
+        <div className="mb-4 text-[11px] text-slate-500">{titleNote}</div>
+      )}
+      {!titleNote && <div className="mb-4" />}
       <table className="w-full">
         <thead>
           <tr className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
@@ -115,7 +128,12 @@ export function UtilizationBars({ roles, coverage, assignments }: Props) {
                 )}
               >
                 <td className="py-2 pr-3 text-xs font-medium text-slate-600">
-                  {ROLE_LABELS[role.role_key] ?? role.role_key}
+                  <div>{ROLE_LABELS[role.role_key] ?? role.role_key}</div>
+                  {roleSubtext?.[role.role_key] && (
+                    <div className="mt-0.5 text-[9px] font-normal tabular-nums text-slate-400">
+                      {roleSubtext[role.role_key]}
+                    </div>
+                  )}
                 </td>
                 <td className="py-2 pr-3">
                   <div className={cn("relative h-5 rounded-full", bgColor)}>
