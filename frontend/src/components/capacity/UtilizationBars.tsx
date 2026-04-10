@@ -41,6 +41,18 @@ const ROLE_LABELS: Record<string, string> = {
   "wms consultant": "WMS Consultant",
 };
 
+/** Classify a raw utilization fraction (0..∞) into a status band.
+ *  Used for the "Total" column pill on v2 so its color matches its own
+ *  value, not the current-week row status. Mirrors the backend bands:
+ *    <0.70 BLUE · <0.80 GREEN · <1.00 YELLOW · >=1.00 RED. */
+function statusForPct(pct: number, supply: number): string {
+  if (supply <= 0 && pct > 0) return "GREY";
+  if (pct >= 1.0) return "RED";
+  if (pct >= 0.8) return "YELLOW";
+  if (pct >= 0.7) return "GREEN";
+  return "BLUE";
+}
+
 interface Props {
   roles: Record<string, RoleUtilizationOut>;
   coverage?: Record<string, RoleCoverage> | null;
@@ -108,9 +120,9 @@ export function UtilizationBars({
             <th className="pb-2 text-left w-28">Role</th>
             <th className="pb-2 text-left">Utilization</th>
             <th className="pb-2 text-right w-14">{totalByRole ? "This Wk" : "Util %"}</th>
-            {totalByRole && <th className="pb-2 text-right w-14">Total</th>}
-            <th className="pb-2 text-right w-16">Demand</th>
+            {totalByRole && <th className="pb-2 text-right w-16">Total</th>}
             <th className="pb-2 text-right w-16">Supply</th>
+            <th className="pb-2 text-right w-16">Demand</th>
             {hasCoverage && (
               <>
                 <th className="pb-2 text-right w-18">Assigned</th>
@@ -169,16 +181,25 @@ export function UtilizationBars({
                     {Math.round(role.utilization_pct * 100)}%
                   </span>
                 </td>
-                {totalByRole && (
-                  <td className="py-2 text-right text-xs font-medium tabular-nums text-slate-600">
-                    {Math.round((totalByRole[role.role_key] ?? 0) * 100)}%
-                  </td>
-                )}
-                <td className="py-2 text-right text-xs tabular-nums text-slate-600">
-                  {role.demand_hrs_week.toFixed(0)}h
-                </td>
+                {totalByRole && (() => {
+                  const totalPct = totalByRole[role.role_key] ?? 0;
+                  const totalStatus = statusForPct(totalPct, role.supply_hrs_week);
+                  return (
+                    <td className="py-2 text-right">
+                      <span className={cn(
+                        "inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
+                        STATUS_PILL[totalStatus] ?? "bg-slate-100 text-slate-600",
+                      )}>
+                        {Math.round(totalPct * 100)}%
+                      </span>
+                    </td>
+                  );
+                })()}
                 <td className="py-2 text-right text-xs tabular-nums text-slate-600">
                   {role.supply_hrs_week.toFixed(0)}h
+                </td>
+                <td className="py-2 text-right text-xs tabular-nums text-slate-600">
+                  {role.demand_hrs_week.toFixed(0)}h
                 </td>
                 {hasCoverage && (
                   <>
