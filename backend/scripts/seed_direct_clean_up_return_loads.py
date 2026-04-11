@@ -23,6 +23,7 @@ Or from inside backend/:
 
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Ensure imports resolve whether run from backend/ or repo root.
 _THIS = Path(__file__).resolve()
@@ -82,8 +83,15 @@ PHASES = [
 ]
 
 
-def main() -> None:
-    db_path = Path(_BACKEND) / "planner.db"
+def main(db_path: Optional[Path] = None) -> None:
+    if db_path is None:
+        # Prefer the backend Settings value so Railway /data/planner.db works.
+        try:
+            from app.config import settings  # type: ignore
+
+            db_path = Path(settings.db_path)
+        except Exception:
+            db_path = Path(_BACKEND) / "planner.db"
     if not db_path.exists():
         raise SystemExit(f"database not found at {db_path}")
     print(f"using database: {db_path}")
