@@ -36,20 +36,31 @@ export function v2PhaseLabel(key: string | null | undefined): string {
 }
 
 /**
- * Map a legacy v1 phase string (e.g. "build", "discovery") to the v2
- * simplified phase it belongs to. Used on the v2 Portfolio page so that
- * projects with v1 `current_phase` values still show a meaningful v2 pill.
+ * Map a phase string to the v2 simplified phase it belongs to.
+ *
+ * Accepts BOTH v1 phase names (from the 6-phase model stored on projects)
+ * AND v2 phase keys (returned by the backend when phase_model=v2 is passed
+ * to the capacity endpoints). This makes the function safe to call with
+ * any phase value without knowing its origin.
  *
  * Rules:
- *   discovery / planning / design  → planning
- *   build                          → execution
- *   test / deploy / deploy_hypercare → testing_go_live
- *   anything else / null            → null
+ *   v1: discovery / planning / design → planning (v2)
+ *   v1: build                          → execution
+ *   v1: test / deploy / hypercare      → testing_go_live
+ *   v2: planning / execution / testing_go_live → pass through
+ *   anything else / null               → null
  */
-export function mapV1PhaseToV2(v1Phase: string | null | undefined): V2PhaseKey | null {
-  if (!v1Phase) return null;
-  const p = v1Phase.toLowerCase().trim();
-  if (["discovery", "planning", "design"].includes(p)) return "planning";
+export function mapV1PhaseToV2(phase: string | null | undefined): V2PhaseKey | null {
+  if (!phase) return null;
+  const p = phase.toLowerCase().trim();
+
+  // v2 phase keys pass through unchanged (idempotent)
+  if (p === "planning" || p === "execution" || p === "testing_go_live") {
+    return p as V2PhaseKey;
+  }
+
+  // v1 phase names map forward
+  if (["discovery", "design"].includes(p)) return "planning";
   if (p === "build") return "execution";
   if (["test", "deploy", "deploy/hypercare", "hypercare"].includes(p)) {
     return "testing_go_live";
