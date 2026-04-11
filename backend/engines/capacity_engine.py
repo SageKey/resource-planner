@@ -806,7 +806,7 @@ class CapacityEngine:
         if duration_days <= 0:
             return {}
 
-        # Determine phase boundaries
+        # Determine phase boundaries (by calendar days, from project dates)
         phase_weights = self.assumptions.sdlc_phase_weights
         phase_list = self.phase_list
         phase_boundaries = []  # (phase_name, start_day, end_day)
@@ -816,6 +816,29 @@ class CapacityEngine:
             phase_days = round(duration_days * weight)
             phase_boundaries.append((phase, cumulative, cumulative + phase_days))
             cumulative += phase_days
+
+        # Phase-aware burndown: figure out which phases are "past" according
+        # to pct_complete. Weeks that would otherwise land in a past phase
+        # get retagged to the first non-past phase so the heatmap shows the
+        # real remaining work, not zero.
+        pct_complete = max(0.0, min(1.0, project.pct_complete or 0.0))
+        EPSILON = 1e-9
+        cum_upper_by_phase: dict[str, float] = {}
+        _running = 0.0
+        for _p in phase_list:
+            _running += phase_weights.get(_p, 0.0)
+            cum_upper_by_phase[_p] = _running
+
+        def _is_past(phase_name: str) -> bool:
+            return cum_upper_by_phase.get(phase_name, 0.0) - pct_complete <= EPSILON
+
+        # First non-past phase — the phase to retag past-phase weeks into.
+        # If everything is past (project done), there's no retag target and
+        # those weeks will naturally show zero.
+        first_non_past: Optional[str] = next(
+            (p for p in phase_list if not _is_past(p)),
+            None,
+        )
 
         # Generate weekly snapshots for each role
         role_timelines = defaultdict(list)
@@ -827,12 +850,23 @@ class CapacityEngine:
                 week_end = min(current + timedelta(days=7), project.end_date)
                 day_offset = (current - project.start_date).days
 
-                # Determine which phase this week falls in
-                current_phase = phase_list[-1]  # default to last
+                # Determine the calendar (date-based) phase for this week
+                date_phase = phase_list[-1]  # default to last
                 for phase_name, start_day, end_day in phase_boundaries:
                     if start_day <= day_offset < end_day:
-                        current_phase = phase_name
+                        date_phase = phase_name
                         break
+
+                # Retag if the date-based phase is already past according to
+                # pct_complete. This keeps the heatmap honest for projects
+                # whose pct_complete has moved ahead of (or doesn't match)
+                # their calendar position — e.g., a project with
+                # start_date in the future but pct_complete > 0, or a
+                # project running ahead of schedule.
+                if first_non_past is not None and _is_past(date_phase):
+                    current_phase = first_non_past
+                else:
+                    current_phase = date_phase
 
                 phase_demand = demand.phase_weekly_hours.get(current_phase, 0.0)
 
