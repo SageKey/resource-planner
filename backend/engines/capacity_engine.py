@@ -467,11 +467,28 @@ class CapacityEngine:
             Remaining = Est.Hours × (1 - pct_complete)
 
         Average weekly demand:
-            Remaining × Role% / Duration_weeks
+            Phase-aware burndown: the engine honors the project's current
+            position (pct_complete) by zeroing out phases that are already
+            done and scaling the current phase's contribution to "what's
+            still left." Past phases contribute 0 hours; current and future
+            phases keep their clean per-week rate (the rate is invariant
+            to how much of the phase is already done, because we scale
+            both numerator and denominator equally).
 
-        Phase-aware weekly demand (for each SDLC phase):
-            Remaining × Role% × Phase_Effort / (Duration_weeks × Phase_Weight)
-            i.e. the fraction of work in that phase spread over the phase's duration.
+        Phase-aware per-week rate during each phase:
+            IF phase is past (its cumulative upper bound ≤ pct_complete):
+                rate = 0
+            ELSE (phase is current or future):
+                rate = Est.Hours × Role% × Phase_Effort / (Duration_weeks × Phase_Weight)
+                (no pct_complete shrinkage — the rate reflects the real
+                per-week demand during that phase)
+
+        Project-average weekly demand (used for the "Total" column):
+            avg = sum(phase_hours_ahead) / sum(phase_weeks_ahead)
+            where the current phase contributes only its remaining portion
+            (partial hours / partial weeks) and future phases contribute in
+            full. For past phases both numerator and denominator are zero,
+            so they drop out entirely.
 
         CRITICAL: Demand is ZERO if Role% == 0 (the allocation gate).
         """
@@ -481,13 +498,27 @@ class CapacityEngine:
         if not duration or duration <= 0 or project.est_hours <= 0:
             return demands
 
-        # Only count remaining work
-        remaining_hours = project.est_hours * (1.0 - min(project.pct_complete, 1.0))
-        if remaining_hours <= 0:
-            return demands
-
         role_phase_efforts = self.assumptions.role_phase_efforts
         phase_weights = self.assumptions.sdlc_phase_weights
+        phase_list = self.phase_list
+
+        # --- Phase-aware burndown setup -------------------------------
+        # Compute cumulative phase boundaries so we can tag each phase as
+        # past / current / future based on the project's pct_complete.
+        # cum_lower[p] is the start of phase p on a 0..1 timeline;
+        # cum_upper[p] is the end. A phase is "past" when its upper bound
+        # has been reached by pct_complete. "Current" when pct_complete
+        # falls inside its [lower, upper) range. "Future" otherwise.
+        cum_lower: dict[str, float] = {}
+        cum_upper: dict[str, float] = {}
+        _running = 0.0
+        for _p in phase_list:
+            cum_lower[_p] = _running
+            _running += phase_weights.get(_p, 0.0)
+            cum_upper[_p] = _running
+
+        pct_complete = max(0.0, min(1.0, project.pct_complete or 0.0))
+        EPSILON = 1e-9  # tolerance for float boundary comparisons
 
         for role_key, alloc_pct in project.role_allocations.items():
             # THE GATE: skip roles with zero allocation
@@ -497,23 +528,63 @@ class CapacityEngine:
             if role_key not in role_phase_efforts:
                 continue
 
-            # Average weekly demand across all phases
-            # NO avg_effort multiplier — phase efforts describe distribution,
-            # not a reduction factor. They sum to 1.0 by design.
-            avg_weekly = remaining_hours * alloc_pct / duration
+            # For each phase, compute the per-week rate AND the "ahead"
+            # contribution to the project-average. Past phases contribute
+            # nothing; the current phase contributes its remaining portion;
+            # future phases contribute in full.
+            phase_weekly: dict[str, float] = {}
+            hours_ahead = 0.0
+            weeks_ahead = 0.0
 
-            # Phase-specific weekly demand
-            # phase_effort = fraction of role's total hours in this phase
-            # phase_weight = fraction of project duration in this phase
-            # weekly = total_role_hrs × phase_effort / (duration × phase_weight)
-            phase_weekly = {}
-            for phase in self.phase_list:
+            for phase in phase_list:
                 phase_effort = role_phase_efforts[role_key].get(phase, 0.0)
                 pw = phase_weights.get(phase, 0.0)
-                if pw > 0:
-                    phase_weekly[phase] = remaining_hours * alloc_pct * phase_effort / (duration * pw)
-                else:
+
+                if pw <= 0:
                     phase_weekly[phase] = 0.0
+                    continue
+
+                # Role's total hours in this phase (full, not shrunk by pct_complete)
+                phase_total_hrs = project.est_hours * alloc_pct * phase_effort
+                # Phase length in weeks (full)
+                phase_total_weeks = duration * pw
+
+                upper = cum_upper.get(phase, 0.0)
+                lower = cum_lower.get(phase, 0.0)
+
+                if upper - pct_complete <= EPSILON:
+                    # Past phase — project has moved beyond it. No remaining
+                    # work, no per-week rate.
+                    phase_weekly[phase] = 0.0
+                elif lower >= pct_complete - EPSILON:
+                    # Fully ahead — the whole phase is still in the future.
+                    phase_weekly[phase] = phase_total_hrs / phase_total_weeks
+                    hours_ahead += phase_total_hrs
+                    weeks_ahead += phase_total_weeks
+                else:
+                    # Current phase — project is partway through it.
+                    # The PER-WEEK RATE is the same as the clean rate
+                    # (both numerator and denominator scale proportionally
+                    # by the remaining fraction, so they cancel). Only
+                    # the avg_weekly contribution needs the partial.
+                    phase_span = upper - lower
+                    if phase_span <= 0:
+                        phase_weekly[phase] = 0.0
+                        continue
+                    progress_in_phase = (pct_complete - lower) / phase_span
+                    remaining_frac = max(0.0, 1.0 - progress_in_phase)
+
+                    phase_weekly[phase] = phase_total_hrs / phase_total_weeks
+                    hours_ahead += phase_total_hrs * remaining_frac
+                    weeks_ahead += phase_total_weeks * remaining_frac
+
+            # Average weekly demand across REMAINING work only (phase-aware).
+            # When pct_complete = 0 this equals the full-project average;
+            # when pct_complete = 1 it equals 0.
+            if weeks_ahead > 0:
+                avg_weekly = hours_ahead / weeks_ahead
+            else:
+                avg_weekly = 0.0
 
             demands.append(RoleDemand(
                 project_id=project.id,
