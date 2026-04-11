@@ -116,6 +116,28 @@ CREATE TABLE IF NOT EXISTS app_settings (
     updated_by      TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_app_settings_category ON app_settings(category);
+
+-- Direct Model (round 1): per-project phase plans with explicit hours per
+-- role per phase. Quarantined from v1/v2 math — nothing outside
+-- direct_engine.py and capacity_direct.py router touches these tables.
+CREATE TABLE IF NOT EXISTS direct_project_phases (
+    project_id      TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    phase_name      TEXT NOT NULL,
+    phase_order     INTEGER NOT NULL,
+    duration_weeks  REAL NOT NULL,
+    PRIMARY KEY (project_id, phase_name)
+);
+
+CREATE TABLE IF NOT EXISTS direct_project_phase_roles (
+    project_id      TEXT NOT NULL,
+    phase_name      TEXT NOT NULL,
+    role_key        TEXT NOT NULL,
+    hours_per_week  REAL NOT NULL DEFAULT 0.0,
+    PRIMARY KEY (project_id, phase_name, role_key),
+    FOREIGN KEY (project_id, phase_name)
+        REFERENCES direct_project_phases(project_id, phase_name)
+        ON DELETE CASCADE
+);
 """
 
 # Default utilization threshold settings
@@ -741,6 +763,110 @@ class SQLiteConnector:
                     "INSERT INTO role_phase_efforts (role_key, phase, effort) VALUES (?, ?, ?) "
                     "ON CONFLICT(role_key, phase) DO UPDATE SET effort = ?",
                     (role_key, phase, effort, effort),
+                )
+        conn.commit()
+
+    # ------------------------------------------------------------------
+    # Direct Model (round 1) — read-only helpers
+    # ------------------------------------------------------------------
+    def list_direct_project_ids(self) -> list[str]:
+        """Return IDs of every project that has a Direct Model phase plan."""
+        conn = self._open()
+        rows = conn.execute(
+            "SELECT DISTINCT project_id FROM direct_project_phases"
+        ).fetchall()
+        return [r["project_id"] for r in rows]
+
+    def read_direct_project_plan(self, project_id: str) -> Optional[dict]:
+        """Return a dict describing a project's Direct Model plan, or None.
+
+        Shape:
+            {
+                "project_id": "ETE-124",
+                "phases": [
+                    {
+                        "name": "planning",
+                        "order": 0,
+                        "duration_weeks": 2.0,
+                        "role_weekly_hours": {"pm": 4.0, "ba": 8.0, ...},
+                    },
+                    ...
+                ]
+            }
+        Phases are returned in `phase_order` ascending. Roles with 0 hours
+        are included so the caller can iterate ROLE_KEYS without checks.
+        """
+        conn = self._open()
+        phase_rows = conn.execute(
+            """SELECT phase_name, phase_order, duration_weeks
+                 FROM direct_project_phases
+                WHERE project_id = ?
+             ORDER BY phase_order""",
+            (project_id,),
+        ).fetchall()
+        if not phase_rows:
+            return None
+
+        role_rows = conn.execute(
+            """SELECT phase_name, role_key, hours_per_week
+                 FROM direct_project_phase_roles
+                WHERE project_id = ?""",
+            (project_id,),
+        ).fetchall()
+        by_phase: dict[str, dict[str, float]] = {}
+        for r in role_rows:
+            by_phase.setdefault(r["phase_name"], {})[r["role_key"]] = (
+                r["hours_per_week"] or 0.0
+            )
+
+        phases = []
+        for pr in phase_rows:
+            phases.append(
+                {
+                    "name": pr["phase_name"],
+                    "order": pr["phase_order"],
+                    "duration_weeks": pr["duration_weeks"],
+                    "role_weekly_hours": by_phase.get(pr["phase_name"], {}),
+                }
+            )
+        return {"project_id": project_id, "phases": phases}
+
+    def write_direct_project_plan(
+        self,
+        project_id: str,
+        phases: list[dict],
+    ) -> None:
+        """Replace a project's Direct Model plan atomically.
+
+        Used by the Round-1 seed script only. The main engine never calls
+        this. `phases` is a list of dicts:
+            {"name": str, "order": int, "duration_weeks": float,
+             "role_weekly_hours": {role_key: float}}
+        """
+        conn = self._open()
+        conn.execute(
+            "DELETE FROM direct_project_phases WHERE project_id = ?",
+            (project_id,),
+        )
+        # cascade deletes from direct_project_phase_roles
+        for phase in phases:
+            conn.execute(
+                """INSERT INTO direct_project_phases
+                       (project_id, phase_name, phase_order, duration_weeks)
+                   VALUES (?, ?, ?, ?)""",
+                (
+                    project_id,
+                    phase["name"],
+                    phase["order"],
+                    phase["duration_weeks"],
+                ),
+            )
+            for role_key, hrs in phase.get("role_weekly_hours", {}).items():
+                conn.execute(
+                    """INSERT INTO direct_project_phase_roles
+                           (project_id, phase_name, role_key, hours_per_week)
+                       VALUES (?, ?, ?, ?)""",
+                    (project_id, phase["name"], role_key, float(hrs)),
                 )
         conn.commit()
 

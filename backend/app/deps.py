@@ -14,7 +14,13 @@ _ENGINES_DIR = Path(__file__).resolve().parents[1]
 if str(_ENGINES_DIR) not in sys.path:
     sys.path.insert(0, str(_ENGINES_DIR))
 
-from engines import SQLiteConnector, CapacityEngine, ScheduleOptimizer, build_v2_assumptions
+from engines import (
+    SQLiteConnector,
+    CapacityEngine,
+    ScheduleOptimizer,
+    DirectEngine,
+    build_v2_assumptions,
+)
 
 
 def get_connector() -> Iterator[SQLiteConnector]:
@@ -50,3 +56,14 @@ def get_capacity(
 
 def get_optimizer(conn: SQLiteConnector = Depends(get_connector)) -> ScheduleOptimizer:
     return ScheduleOptimizer(connector=conn)
+
+
+def get_direct_engine(conn: SQLiteConnector = Depends(get_connector)) -> DirectEngine:
+    """Direct Model (round 1) engine dependency.
+
+    Independent from `get_capacity` — Direct Model does not accept a
+    `phase_model` query param and does not consume RMAssumptions. The
+    engine reads directly from the quarantined `direct_project_phases`
+    and `direct_project_phase_roles` tables.
+    """
+    return DirectEngine(connector=conn)

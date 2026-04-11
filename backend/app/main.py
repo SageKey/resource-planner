@@ -21,6 +21,7 @@ from .config import settings
 from .routers import (
     assignments,
     capacity,
+    capacity_direct,
     explain,
     import_data,
     meta,
@@ -125,6 +126,7 @@ def create_app() -> FastAPI:
     app.include_router(assignments.router, prefix=settings.api_prefix)
     app.include_router(portfolio.router, prefix=settings.api_prefix)
     app.include_router(capacity.router, prefix=settings.api_prefix)
+    app.include_router(capacity_direct.router, prefix=settings.api_prefix)
     app.include_router(roster.router, prefix=settings.api_prefix)
     app.include_router(scenarios.router, prefix=settings.api_prefix)
     app.include_router(sdlc.router, prefix=settings.api_prefix)

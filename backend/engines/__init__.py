@@ -29,6 +29,7 @@ from .capacity_engine import (
     build_v2_assumptions,
 )
 from .schedule_optimizer import ScheduleOptimizer
+from .direct_engine import DirectEngine, DirectPhase, DirectProjectPlan
 
 __all__ = [
     "SQLiteConnector",
@@ -39,6 +40,9 @@ __all__ = [
     "_utilization_status",
     "build_v2_assumptions",
     "ScheduleOptimizer",
+    "DirectEngine",
+    "DirectPhase",
+    "DirectProjectPlan",
     "Project",
     "TeamMember",
     "RMAssumptions",
