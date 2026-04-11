@@ -14,6 +14,7 @@ import { UtilizationBars } from "@/components/capacity/UtilizationBars";
 import { DirectRoleHeatmap } from "../components/DirectRoleHeatmap";
 import { DirectPersonHeatmap } from "../components/DirectPersonHeatmap";
 import { DirectPhasePlanCard } from "../components/DirectPhasePlanCard";
+import { DirectProjectResourcesCard } from "../components/DirectProjectResourcesCard";
 import {
   useDirectUtilization,
   useDirectHeatmap,
@@ -56,6 +57,9 @@ export function DirectCapacity() {
         {/* Phase plan card — shows the seeded template */}
         {plan.data && <DirectPhasePlanCard plan={plan.data} />}
         {plan.isError && <ErrorCard err={plan.error as Error} />}
+
+        {/* Per-project resources + utilization */}
+        {plan.data && <DirectProjectResourcesCard plan={plan.data} />}
 
         {/* Role utilization bars (reused from shared components) */}
         {util.data?.roles && (

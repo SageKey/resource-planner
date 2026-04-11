@@ -35,6 +35,19 @@ export interface DirectPhaseOut {
   role_weekly_hours: Record<string, number>;
 }
 
+export interface DirectResourceRow {
+  role_key: string;
+  person_name: string | null;
+  person_capacity_hrs_week: number | null;
+  allocation_pct: number | null;
+  current_phase_hrs_week: number;
+  current_phase_name: string | null;
+  peak_hrs_week: number;
+  lifetime_hrs: number;
+  current_pct_of_capacity: number | null;
+  peak_pct_of_capacity: number | null;
+}
+
 export interface DirectProjectPlanOut {
   project_id: string;
   project_name: string;
@@ -44,6 +57,7 @@ export interface DirectProjectPlanOut {
   role_totals: Record<string, number>;
   start_date?: string | null;
   end_date?: string | null;
+  resources: DirectResourceRow[];
 }
 
 export interface DirectProjectSummary {

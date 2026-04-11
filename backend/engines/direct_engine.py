@@ -216,6 +216,119 @@ class DirectEngine:
         return list(self._load()["plans"])
 
     # ------------------------------------------------------------------
+    # Public: per-project resource/utilization view
+    # ------------------------------------------------------------------
+    def compute_project_resources(self, project_id: str) -> Optional[list[dict]]:
+        """Per-role resource view for a single Direct Model project.
+
+        Returns one row per role that has hours in the plan, plus any
+        extra assigned role. Each row includes the assigned person (if
+        any), that person's weekly project capacity, this project's
+        current/peak/lifetime hours for the role, and the % of the
+        person's capacity this one project consumes in the current
+        phase.
+
+        Returns None if the project has no Direct Model plan.
+        """
+        plan = self.get_project_plan(project_id)
+        if plan is None:
+            return None
+
+        data = self._load()
+        project = data["by_id"].get(project_id)
+
+        # Determine current phase so "current wk" numbers are accurate.
+        current_phase_name: Optional[str] = None
+        if project and project.start_date:
+            wso = self._weeks_since_start(plan, project, self._scan_start())
+            if wso is not None:
+                current_phase = plan.phase_at_week(wso)
+                if current_phase is not None:
+                    current_phase_name = current_phase.name
+
+        # Index assignments for this project: role_key -> list[(name, alloc)]
+        assignments_by_role: dict[str, list[tuple[str, float]]] = defaultdict(list)
+        for a in data["assignments"]:
+            if a.project_id == project_id:
+                assignments_by_role[a.role_key].append(
+                    (a.person_name, a.allocation_pct)
+                )
+
+        # Index roster for capacity lookup
+        roster_by_name: dict[str, float] = {}
+        for m in data["roster"]:
+            roster_by_name[m.name.strip().lower()] = m.project_capacity_hrs
+
+        # Compute per-role aggregates from the plan
+        role_totals = plan.role_totals()
+        peak_by_role: dict[str, float] = defaultdict(float)
+        current_by_role: dict[str, float] = defaultdict(float)
+        current_phase_label_by_role: dict[str, str] = {}
+        for phase in plan.phases:
+            for role_key, hrs in phase.role_weekly_hours.items():
+                if hrs > peak_by_role[role_key]:
+                    peak_by_role[role_key] = hrs
+                if phase.name == current_phase_name:
+                    current_by_role[role_key] = hrs
+                    current_phase_label_by_role[role_key] = phase.name
+
+        # Roles to show: any role with > 0 lifetime hours OR any role
+        # with an assignment (so "orphan" assignments still surface).
+        role_keys_with_work = {
+            rk for rk, total in role_totals.items() if total > 0
+        }
+        role_keys_assigned = set(assignments_by_role.keys())
+        all_role_keys = role_keys_with_work | role_keys_assigned
+
+        rows: list[dict] = []
+        for role_key in sorted(all_role_keys):
+            lifetime = role_totals.get(role_key, 0.0)
+            peak = peak_by_role.get(role_key, 0.0)
+            current = current_by_role.get(role_key, 0.0)
+
+            assignees = assignments_by_role.get(role_key, [])
+            if not assignees:
+                rows.append(
+                    {
+                        "role_key": role_key,
+                        "person_name": None,
+                        "person_capacity_hrs_week": None,
+                        "allocation_pct": None,
+                        "current_phase_hrs_week": round(current, 2),
+                        "current_phase_name": current_phase_name,
+                        "peak_hrs_week": round(peak, 2),
+                        "lifetime_hrs": round(lifetime, 2),
+                        "current_pct_of_capacity": None,
+                        "peak_pct_of_capacity": None,
+                    }
+                )
+                continue
+
+            for person_name, alloc in assignees:
+                capacity = roster_by_name.get(person_name.strip().lower(), 0.0)
+                demand_current = current * alloc
+                demand_peak = peak * alloc
+                rows.append(
+                    {
+                        "role_key": role_key,
+                        "person_name": person_name,
+                        "person_capacity_hrs_week": round(capacity, 2) if capacity else 0.0,
+                        "allocation_pct": alloc,
+                        "current_phase_hrs_week": round(demand_current, 2),
+                        "current_phase_name": current_phase_name,
+                        "peak_hrs_week": round(demand_peak, 2),
+                        "lifetime_hrs": round(lifetime * alloc, 2),
+                        "current_pct_of_capacity": (
+                            round(demand_current / capacity, 4) if capacity > 0 else None
+                        ),
+                        "peak_pct_of_capacity": (
+                            round(demand_peak / capacity, 4) if capacity > 0 else None
+                        ),
+                    }
+                )
+        return rows
+
+    # ------------------------------------------------------------------
     # Public: current-week utilization
     # ------------------------------------------------------------------
     def compute_utilization(self) -> dict[str, dict]:

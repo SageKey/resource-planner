@@ -143,50 +143,13 @@ def main(db_path: Optional[Path] = None) -> None:
             )
         print(f"  total hours:     {total_hours:.0f}h")
 
-        # 4. Backfill project_assignments if missing, so /direct/capacity can
-        #    render a person heatmap. This is one-shot dev convenience — it
-        #    only runs when there are zero assignments for ETE-124. It will
-        #    never overwrite user-curated assignments.
-        existing_assignments = raw_conn.execute(
-            "SELECT COUNT(*) FROM project_assignments WHERE project_id = ?",
-            (PROJECT_ID,),
-        ).fetchone()[0]
-        if existing_assignments == 0:
-            proj_row = raw_conn.execute(
-                """SELECT pm, ba, functional_lead, technical_lead, developer_lead
-                     FROM projects WHERE id = ?""",
-                (PROJECT_ID,),
-            ).fetchone()
-            lead_rows = [
-                (proj_row["pm"], "pm"),
-                (proj_row["ba"], "ba"),
-                (proj_row["functional_lead"], "functional"),
-                (proj_row["technical_lead"], "technical"),
-                (proj_row["developer_lead"], "developer"),
-            ]
-            added = 0
-            for person_name, role_key in lead_rows:
-                if not person_name:
-                    continue
-                # Only add assignments for roles that have non-zero hours
-                # somewhere in the plan, to avoid dead rows (e.g., developer).
-                role_has_hours = any(
-                    phase["role_weekly_hours"].get(role_key, 0.0) > 0
-                    for phase in PHASES
-                )
-                if not role_has_hours:
-                    continue
-                err = conn.save_assignment(PROJECT_ID, person_name, role_key, 1.0)
-                if err:
-                    print(f"  warn: could not add {person_name} as {role_key}: {err}")
-                else:
-                    added += 1
-                    print(f"  + assignment: {person_name} as {role_key} @ 100%")
-            if added:
-                print(f"  backfilled {added} assignment(s)")
-        else:
-            print(f"  {existing_assignments} existing assignment(s) — leaving untouched")
-
+        # Note: this script deliberately does NOT touch project_assignments.
+        # Direct Model owns phase plans only; assignments are curated
+        # through the normal Assignments UI and are the source of truth.
+        # An earlier version of this script backfilled assignments from
+        # project.lead fields, but those leads are not always the people
+        # who actually do the work (e.g., technical_lead = nominal owner,
+        # not always the assignee). Removed to avoid creating bogus rows.
         print("done.")
     finally:
         conn.close()

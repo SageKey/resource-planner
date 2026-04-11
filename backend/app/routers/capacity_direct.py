@@ -20,7 +20,11 @@ from ..schemas.capacity import (
     RoleUtilizationOut,
     UtilizationResponse,
 )
-from ..schemas.capacity_direct import DirectPhaseOut, DirectProjectPlanOut
+from ..schemas.capacity_direct import (
+    DirectPhaseOut,
+    DirectProjectPlanOut,
+    DirectResourceRow,
+)
 from engines import DirectEngine
 
 router = APIRouter(prefix="/direct", tags=["direct"])
@@ -113,6 +117,9 @@ def direct_project_plan(
     start_str = project.start_date.isoformat() if project and project.start_date else None
     end_str = project.end_date.isoformat() if project and project.end_date else None
 
+    resources_raw = engine.compute_project_resources(project_id) or []
+    resources = [DirectResourceRow(**r) for r in resources_raw]
+
     return DirectProjectPlanOut(
         project_id=plan.project_id,
         project_name=plan.project_name,
@@ -130,6 +137,7 @@ def direct_project_plan(
         role_totals=plan.role_totals(),
         start_date=start_str,
         end_date=end_str,
+        resources=resources,
     )
 
 
