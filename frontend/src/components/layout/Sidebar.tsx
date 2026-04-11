@@ -25,6 +25,8 @@ const NAV_ITEMS: NavItem[] = [
   // Simplified SDLC (v2) — parallel 3-phase view alongside the main app.
   { to: "/v2/capacity", label: "Capacity", icon: BarChart3, section: "Simplified SDLC" },
   { to: "/v2/portfolio", label: "Portfolio", icon: FolderKanban, section: "Simplified SDLC" },
+  // Direct Model (round 1) — explicit hours per role per phase, no percentages.
+  { to: "/direct/capacity", label: "Capacity", icon: BarChart3, section: "Direct Model" },
 ];
 
 export function Sidebar() {

@@ -8,6 +8,7 @@ import { Settings } from "@/pages/Settings";
 import { Wireframes } from "@/pages/Wireframes";
 import { CapacityV2 } from "@/pages/CapacityV2";
 import { PortfolioV2 } from "@/pages/PortfolioV2";
+import { DirectCapacity } from "@/features/direct/pages/DirectCapacity";
 
 export const router = createBrowserRouter([
   {
@@ -24,6 +25,8 @@ export const router = createBrowserRouter([
       // Simplified SDLC (v2) — parallel 3-phase capacity view.
       { path: "v2/capacity", element: <CapacityV2 /> },
       { path: "v2/portfolio", element: <PortfolioV2 /> },
+      // Direct Model (round 1) — explicit hours/week, no percentages.
+      { path: "direct/capacity", element: <DirectCapacity /> },
     ],
   },
 ]);
