@@ -17,6 +17,65 @@ export const V2_PHASE_LABEL: Record<V2PhaseKey, string> = {
   testing_go_live: "Testing / Go Live",
 };
 
+/**
+ * Mirror of DEFAULT_PHASE_WEIGHTS_V2 in backend/engines/models.py.
+ * What fraction of a project's timeline each phase occupies.
+ * Display-only; the backend is the source of truth for math.
+ */
+export const V2_PHASE_WEIGHTS: Record<V2PhaseKey, number> = {
+  planning: 0.20,
+  execution: 0.60,
+  testing_go_live: 0.20,
+};
+
+/**
+ * Mirror of DEFAULT_ROLE_PHASE_EFFORTS_V2 in backend/engines/models.py.
+ * For each role, what fraction of their total project hours happens in
+ * each phase. Each row sums to 1.00. Used to build "why this number
+ * looks the way it does" explanations in the person detail modal.
+ */
+export const V2_ROLE_PHASE_EFFORTS: Record<string, Record<V2PhaseKey, number>> = {
+  pm:             { planning: 0.30, execution: 0.50, testing_go_live: 0.20 },
+  ba:             { planning: 0.65, execution: 0.25, testing_go_live: 0.10 },
+  functional:     { planning: 0.60, execution: 0.30, testing_go_live: 0.10 },
+  technical:      { planning: 0.40, execution: 0.50, testing_go_live: 0.10 },
+  developer:      { planning: 0.05, execution: 0.80, testing_go_live: 0.15 },
+  infrastructure: { planning: 0.10, execution: 0.30, testing_go_live: 0.60 },
+  dba:            { planning: 0.10, execution: 0.60, testing_go_live: 0.30 },
+  erp:            { planning: 0.15, execution: 0.30, testing_go_live: 0.55 },
+  wms:            { planning: 0.15, execution: 0.30, testing_go_live: 0.55 },
+};
+
+/** Human-friendly role label for explanation text. */
+export const ROLE_DISPLAY_NAME: Record<string, string> = {
+  pm: "PM",
+  ba: "BA",
+  functional: "Functional",
+  technical: "Technical",
+  developer: "Developer",
+  infrastructure: "Infrastructure",
+  dba: "DBA",
+  erp: "ERP Consultant",
+  wms: "WMS Consultant",
+  "wms consultant": "WMS Consultant",
+};
+
+/**
+ * Look up a role's effort % in a given v2 phase. Returns null if the
+ * role or phase isn't known.
+ */
+export function roleEffortInPhase(
+  roleKey: string,
+  phaseKey: string | null | undefined,
+): number | null {
+  if (!phaseKey) return null;
+  const v2Phase = mapV1PhaseToV2(phaseKey);
+  if (!v2Phase) return null;
+  const efforts = V2_ROLE_PHASE_EFFORTS[roleKey.toLowerCase()];
+  if (!efforts) return null;
+  return efforts[v2Phase];
+}
+
 /** Tailwind classes for the v2 phase pill — matches the Phase Kanban
  *  wireframe color vocabulary so v2 visual language stays consistent. */
 export const V2_PHASE_STYLE: Record<V2PhaseKey, string> = {

@@ -6,7 +6,13 @@ import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useAssignmentMatrix, type MatrixData } from "@/hooks/useAssignments";
 import type { PersonHeatmapResponse, PersonHeatmapRow } from "@/hooks/useCapacity";
 import { usePersonHeatmapDetailV2 } from "@/hooks/useCapacityV2";
-import { mapV1PhaseToV2, v2PhaseLabel, v2PhaseStyle } from "@/lib/phaseModelV2";
+import {
+  mapV1PhaseToV2,
+  v2PhaseLabel,
+  v2PhaseStyle,
+  roleEffortInPhase,
+  ROLE_DISPLAY_NAME,
+} from "@/lib/phaseModelV2";
 
 /**
  * TeamAllocationCards
@@ -566,6 +572,17 @@ function AssignedProjectRow({
     ? `${currentWeekHours.toFixed(1)}h this week`
     : "No work this week";
 
+  // Build a one-line explanation for WHY this number is what it is.
+  // Example: "BAs do 10% of their work in Testing / Go Live" — answers
+  // "why is this 0.2h?" without requiring the viewer to know the math.
+  const effortPct = roleEffortInPhase(project.role_key, currentPhase);
+  const roleDisplayName =
+    ROLE_DISPLAY_NAME[project.role_key.toLowerCase()] ?? project.role_key;
+  const explanation =
+    effortPct !== null && v2PhaseLbl
+      ? `${roleDisplayName}s do ${Math.round(effortPct * 100)}% of their work in ${v2PhaseLbl}`
+      : null;
+
   return (
     <button
       onClick={onClick}
@@ -618,6 +635,13 @@ function AssignedProjectRow({
             </span>
           )}
         </div>
+        {/* "Why this number?" explainer — shows the role's effort % in the
+            current phase so tiny/large numbers are self-explanatory. */}
+        {explanation && (
+          <div className="mt-0.5 text-[9px] italic text-slate-400">
+            {explanation}
+          </div>
+        )}
       </div>
       <div className="shrink-0 text-right">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
