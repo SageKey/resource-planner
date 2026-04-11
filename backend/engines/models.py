@@ -33,7 +33,7 @@ DEFAULT_PHASE_WEIGHTS_V2 = {
 # Testing/Go Live.
 DEFAULT_ROLE_PHASE_EFFORTS_V2 = {
     "pm":             {"planning": 0.30, "execution": 0.50, "testing_go_live": 0.20},
-    "ba":             {"planning": 0.65, "execution": 0.25, "testing_go_live": 0.10},
+    "ba":             {"planning": 0.40, "execution": 0.20, "testing_go_live": 0.40},
     "functional":     {"planning": 0.60, "execution": 0.30, "testing_go_live": 0.10},
     "technical":      {"planning": 0.40, "execution": 0.50, "testing_go_live": 0.10},
     "developer":      {"planning": 0.05, "execution": 0.80, "testing_go_live": 0.15},
